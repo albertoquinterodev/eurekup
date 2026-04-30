@@ -9,38 +9,154 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppStorageIndexRouteImport } from './routes/app.storage.index'
+import { Route as AppSettingsIndexRouteImport } from './routes/app.settings.index'
+import { Route as AppContactsIndexRouteImport } from './routes/app.contacts.index'
+import { Route as AppChatsIndexRouteImport } from './routes/app.chats.index'
+import { Route as AppChannelsIndexRouteImport } from './routes/app.channels.index'
+import { Route as AppChatsIdRouteImport } from './routes/app.chats.$id'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppStorageIndexRoute = AppStorageIndexRouteImport.update({
+  id: '/storage/',
+  path: '/storage/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContactsIndexRoute = AppContactsIndexRouteImport.update({
+  id: '/contacts/',
+  path: '/contacts/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChatsIndexRoute = AppChatsIndexRouteImport.update({
+  id: '/chats/',
+  path: '/chats/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChannelsIndexRoute = AppChannelsIndexRouteImport.update({
+  id: '/channels/',
+  path: '/channels/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChatsIdRoute = AppChatsIdRouteImport.update({
+  id: '/chats/$id',
+  path: '/chats/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels/': typeof AppChannelsIndexRoute
+  '/app/chats/': typeof AppChatsIndexRoute
+  '/app/contacts/': typeof AppContactsIndexRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/storage/': typeof AppStorageIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels': typeof AppChannelsIndexRoute
+  '/app/chats': typeof AppChatsIndexRoute
+  '/app/contacts': typeof AppContactsIndexRoute
+  '/app/settings': typeof AppSettingsIndexRoute
+  '/app/storage': typeof AppStorageIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels/': typeof AppChannelsIndexRoute
+  '/app/chats/': typeof AppChatsIndexRoute
+  '/app/contacts/': typeof AppContactsIndexRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/storage/': typeof AppStorageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/auth'
+    | '/app/chats/$id'
+    | '/app/channels/'
+    | '/app/chats/'
+    | '/app/contacts/'
+    | '/app/settings/'
+    | '/app/storage/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/app'
+    | '/auth'
+    | '/app/chats/$id'
+    | '/app/channels'
+    | '/app/chats'
+    | '/app/contacts'
+    | '/app/settings'
+    | '/app/storage'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/auth'
+    | '/app/chats/$id'
+    | '/app/channels/'
+    | '/app/chats/'
+    | '/app/contacts/'
+    | '/app/settings/'
+    | '/app/storage/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,21 +164,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/storage/': {
+      id: '/app/storage/'
+      path: '/storage'
+      fullPath: '/app/storage/'
+      preLoaderRoute: typeof AppStorageIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings/': {
+      id: '/app/settings/'
+      path: '/settings'
+      fullPath: '/app/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/contacts/': {
+      id: '/app/contacts/'
+      path: '/contacts'
+      fullPath: '/app/contacts/'
+      preLoaderRoute: typeof AppContactsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/chats/': {
+      id: '/app/chats/'
+      path: '/chats'
+      fullPath: '/app/chats/'
+      preLoaderRoute: typeof AppChatsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/channels/': {
+      id: '/app/channels/'
+      path: '/channels'
+      fullPath: '/app/channels/'
+      preLoaderRoute: typeof AppChannelsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/chats/$id': {
+      id: '/app/chats/$id'
+      path: '/chats/$id'
+      fullPath: '/app/chats/$id'
+      preLoaderRoute: typeof AppChatsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppChatsIdRoute: typeof AppChatsIdRoute
+  AppChannelsIndexRoute: typeof AppChannelsIndexRoute
+  AppChatsIndexRoute: typeof AppChatsIndexRoute
+  AppContactsIndexRoute: typeof AppContactsIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppStorageIndexRoute: typeof AppStorageIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppChatsIdRoute: AppChatsIdRoute,
+  AppChannelsIndexRoute: AppChannelsIndexRoute,
+  AppChatsIndexRoute: AppChatsIndexRoute,
+  AppContactsIndexRoute: AppContactsIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppStorageIndexRoute: AppStorageIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
