@@ -14,16 +14,378 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      channel_join_requests: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["join_request_status"]
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["join_request_status"]
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["join_request_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_join_requests_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          tags: string[]
+          visibility: Database["public"]["Enums"]["channel_visibility"]
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          tags?: string[]
+          visibility?: Database["public"]["Enums"]["channel_visibility"]
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          tags?: string[]
+          visibility?: Database["public"]["Enums"]["channel_visibility"]
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          contact_user_id: string
+          created_at: string
+          id: string
+          owner_id: string
+        }
+        Insert: {
+          contact_user_id: string
+          created_at?: string
+          id?: string
+          owner_id: string
+        }
+        Update: {
+          contact_user_id?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_contact_user_id_fkey"
+            columns: ["contact_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_members: {
+        Row: {
+          conversation_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["conversation_kind"]
+          last_message_at: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["conversation_kind"]
+          last_message_at?: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["conversation_kind"]
+          last_message_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      files: {
+        Row: {
+          created_at: string
+          folder_id: string | null
+          id: string
+          mime_type: string | null
+          name: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          owner_id: string
+          size_bytes?: number
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          owner_id?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      folders: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          parent_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          parent_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          created_at: string
+          file_id: string | null
+          id: string
+          sender_id: string
+          status: Database["public"]["Enums"]["message_status"]
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          created_at?: string
+          file_id?: string | null
+          id?: string
+          sender_id: string
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          created_at?: string
+          file_id?: string | null
+          id?: string
+          sender_id?: string
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          referral_code: string
+          referred_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name: string
+          email: string
+          id: string
+          referral_code: string
+          referred_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          referral_code?: string
+          referred_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          invited_email: string
+          invited_user_id: string | null
+          referrer_id: string
+          status: Database["public"]["Enums"]["referral_status"]
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_email: string
+          invited_user_id?: string | null
+          referrer_id: string
+          status?: Database["public"]["Enums"]["referral_status"]
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_email?: string
+          invited_user_id?: string | null
+          referrer_id?: string
+          status?: Database["public"]["Enums"]["referral_status"]
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
+      storage_quota: {
+        Row: {
+          total_bytes: number
+          updated_at: string
+          used_bytes: number
+          user_id: string
+        }
+        Insert: {
+          total_bytes?: number
+          updated_at?: string
+          used_bytes?: number
+          user_id: string
+        }
+        Update: {
+          total_bytes?: number
+          updated_at?: string
+          used_bytes?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_channel_member: {
+        Args: { _channel: string; _user: string }
+        Returns: boolean
+      }
+      is_conversation_member: {
+        Args: { _conv: string; _user: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      channel_visibility: "public" | "private"
+      conversation_kind: "direct" | "channel"
+      join_request_status: "pending" | "approved" | "rejected"
+      message_status: "sent" | "delivered" | "read"
+      referral_status: "pending" | "verified"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +512,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      channel_visibility: ["public", "private"],
+      conversation_kind: ["direct", "channel"],
+      join_request_status: ["pending", "approved", "rejected"],
+      message_status: ["sent", "delivered", "read"],
+      referral_status: ["pending", "verified"],
+    },
   },
 } as const
