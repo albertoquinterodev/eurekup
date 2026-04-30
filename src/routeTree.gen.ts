@@ -13,8 +13,10 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppStorageIndexRouteImport } from './routes/app.storage.index'
+import { Route as AppSettingsIndexRouteImport } from './routes/app.settings.index'
 import { Route as AppContactsIndexRouteImport } from './routes/app.contacts.index'
 import { Route as AppChatsIndexRouteImport } from './routes/app.chats.index'
+import { Route as AppChannelsIndexRouteImport } from './routes/app.channels.index'
 import { Route as AppChatsIdRouteImport } from './routes/app.chats.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -37,6 +39,11 @@ const AppStorageIndexRoute = AppStorageIndexRouteImport.update({
   path: '/storage/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContactsIndexRoute = AppContactsIndexRouteImport.update({
   id: '/contacts/',
   path: '/contacts/',
@@ -45,6 +52,11 @@ const AppContactsIndexRoute = AppContactsIndexRouteImport.update({
 const AppChatsIndexRoute = AppChatsIndexRouteImport.update({
   id: '/chats/',
   path: '/chats/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChannelsIndexRoute = AppChannelsIndexRouteImport.update({
+  id: '/channels/',
+  path: '/channels/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppChatsIdRoute = AppChatsIdRouteImport.update({
@@ -58,8 +70,10 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels/': typeof AppChannelsIndexRoute
   '/app/chats/': typeof AppChatsIndexRoute
   '/app/contacts/': typeof AppContactsIndexRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
   '/app/storage/': typeof AppStorageIndexRoute
 }
 export interface FileRoutesByTo {
@@ -67,8 +81,10 @@ export interface FileRoutesByTo {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels': typeof AppChannelsIndexRoute
   '/app/chats': typeof AppChatsIndexRoute
   '/app/contacts': typeof AppContactsIndexRoute
+  '/app/settings': typeof AppSettingsIndexRoute
   '/app/storage': typeof AppStorageIndexRoute
 }
 export interface FileRoutesById {
@@ -77,8 +93,10 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/chats/$id': typeof AppChatsIdRoute
+  '/app/channels/': typeof AppChannelsIndexRoute
   '/app/chats/': typeof AppChatsIndexRoute
   '/app/contacts/': typeof AppContactsIndexRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
   '/app/storage/': typeof AppStorageIndexRoute
 }
 export interface FileRouteTypes {
@@ -88,8 +106,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/chats/$id'
+    | '/app/channels/'
     | '/app/chats/'
     | '/app/contacts/'
+    | '/app/settings/'
     | '/app/storage/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -97,8 +117,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/chats/$id'
+    | '/app/channels'
     | '/app/chats'
     | '/app/contacts'
+    | '/app/settings'
     | '/app/storage'
   id:
     | '__root__'
@@ -106,8 +128,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/chats/$id'
+    | '/app/channels/'
     | '/app/chats/'
     | '/app/contacts/'
+    | '/app/settings/'
     | '/app/storage/'
   fileRoutesById: FileRoutesById
 }
@@ -147,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStorageIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/settings/': {
+      id: '/app/settings/'
+      path: '/settings'
+      fullPath: '/app/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contacts/': {
       id: '/app/contacts/'
       path: '/contacts'
@@ -161,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChatsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/channels/': {
+      id: '/app/channels/'
+      path: '/channels'
+      fullPath: '/app/channels/'
+      preLoaderRoute: typeof AppChannelsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/chats/$id': {
       id: '/app/chats/$id'
       path: '/chats/$id'
@@ -173,15 +211,19 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppChatsIdRoute: typeof AppChatsIdRoute
+  AppChannelsIndexRoute: typeof AppChannelsIndexRoute
   AppChatsIndexRoute: typeof AppChatsIndexRoute
   AppContactsIndexRoute: typeof AppContactsIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppStorageIndexRoute: typeof AppStorageIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppChatsIdRoute: AppChatsIdRoute,
+  AppChannelsIndexRoute: AppChannelsIndexRoute,
   AppChatsIndexRoute: AppChatsIndexRoute,
   AppContactsIndexRoute: AppContactsIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppStorageIndexRoute: AppStorageIndexRoute,
 }
 
