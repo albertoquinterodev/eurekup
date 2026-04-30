@@ -1,0 +1,260 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
+import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { AppBar } from "@/components/app-bar";
+import { Avatar } from "@/components/avatar-bubble";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatBytes } from "@/lib/format";
+
+export const Route = createFileRoute("/app/settings/")({
+  component: Settings,
+});
+
+interface Profile {
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
+  referral_code: string;
+}
+
+function Settings() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [quota, setQuota] = useState({ used: 0, total: 0 });
+  const [referrals, setReferrals] = useState<{ verified: number; pending: number }>({ verified: 0, pending: 0 });
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const [{ data: p }, { data: q }, { data: refs }] = await Promise.all([
+        supabase.from("profiles").select("display_name, email, avatar_url, referral_code").eq("id", user.id).single(),
+        supabase.from("storage_quota").select("used_bytes, total_bytes").eq("user_id", user.id).single(),
+        supabase.from("referrals").select("status").eq("referrer_id", user.id),
+      ]);
+      if (p) setProfile(p);
+      if (q) setQuota({ used: Number(q.used_bytes), total: Number(q.total_bytes) });
+      if (refs) {
+        setReferrals({
+          verified: refs.filter((r) => r.status === "verified").length,
+          pending: refs.filter((r) => r.status === "pending").length,
+        });
+      }
+    };
+    load();
+  }, [user]);
+
+  const invite = async () => {
+    const parsed = z.string().trim().email().max(255).safeParse(inviteEmail);
+    if (!parsed.success) {
+      toast.error("Email inválido");
+      return;
+    }
+    if (!user || !profile) return;
+    setInviting(true);
+    try {
+      const target = parsed.data.toLowerCase();
+      const { error } = await supabase.from("referrals").insert({
+        referrer_id: user.id,
+        invited_email: target,
+      });
+      if (error) {
+        if (error.message.includes("duplicate")) {
+          toast.message("Ya invitaste a este email");
+        } else {
+          throw error;
+        }
+      } else {
+        // Open mailto so user can send the invitation right away
+        const subject = encodeURIComponent("Te invito a Nebula");
+        const body = encodeURIComponent(
+          `Hola,\n\nQuiero invitarte a Nebula, una app que combina chats y archivos.\nÚsa mi código de referido al registrarte: ${profile.referral_code}\n\nÚnete: ${window.location.origin}/auth\n\n— ${profile.display_name}`
+        );
+        window.location.href = `mailto:${target}?subject=${subject}&body=${body}`;
+        setReferrals((r) => ({ ...r, pending: r.pending + 1 }));
+        setInviteEmail("");
+        toast.success("Invitación lista para enviar");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const copyCode = () => {
+    if (!profile) return;
+    navigator.clipboard.writeText(profile.referral_code);
+    toast.success("Código copiado");
+  };
+
+  const logout = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+    // Sign out + delete profile (cascade removes data). Auth user removal needs admin.
+    await supabase.from("profiles").delete().eq("id", user.id);
+    await signOut();
+    toast.success("Cuenta eliminada");
+    navigate({ to: "/" });
+  };
+
+  const usedPct = quota.total ? Math.min(100, (quota.used / quota.total) * 100) : 0;
+
+  return (
+    <>
+      <AppBar title="Ajustes" />
+
+      <div className="space-y-3 px-3 pb-4 pt-3">
+        {/* Profile */}
+        <div className="glass rounded-3xl p-5">
+          {profile ? (
+            <div className="flex items-center gap-4">
+              <Avatar name={profile.display_name} url={profile.avatar_url} size="lg" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold">{profile.display_name}</p>
+                <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+              </div>
+            </div>
+          ) : (
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          )}
+        </div>
+
+        {/* Storage */}
+        <div className="glass rounded-3xl p-5">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-medium">Almacenamiento</p>
+            <p className="text-sm">
+              <span className="font-semibold">{formatBytes(quota.used)}</span>{" "}
+              <span className="text-muted-foreground">/ {formatBytes(quota.total)}</span>
+            </p>
+          </div>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-glass">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${usedPct}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Invita amigos para ganar +1 GB por cada uno verificado.
+          </p>
+        </div>
+
+        {/* Referrals */}
+        <div className="glass rounded-3xl p-5">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            <p className="font-medium">Referidos</p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="glass-subtle rounded-2xl p-3 text-center">
+              <p className="text-2xl font-semibold">{referrals.verified}</p>
+              <p className="text-xs text-muted-foreground">Verificados</p>
+            </div>
+            <div className="glass-subtle rounded-2xl p-3 text-center">
+              <p className="text-2xl font-semibold">{referrals.pending}</p>
+              <p className="text-xs text-muted-foreground">Pendientes</p>
+            </div>
+          </div>
+
+          {profile && (
+            <button
+              onClick={copyCode}
+              className="mt-3 flex w-full items-center justify-between rounded-2xl glass-subtle px-4 py-3 text-sm transition hover:bg-glass"
+            >
+              <span className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-muted-foreground" />
+                <span className="font-mono font-semibold tracking-wider">{profile.referral_code}</span>
+              </span>
+              <Copy className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+
+          <div className="mt-3 flex gap-2">
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="email@amigo.com"
+              className="flex-1 rounded-full glass-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <button
+              onClick={invite}
+              disabled={inviting}
+              className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Invitar
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="glass rounded-3xl overflow-hidden">
+          <button
+            onClick={() => navigate({ to: "/app/channels" })}
+            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
+          >
+            <Hash className="h-5 w-5 text-muted-foreground" />
+            <span className="flex-1">Explorar canales</span>
+          </button>
+          <div className="ml-12 h-px bg-glass-border" />
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              toast.info("Política de privacidad disponible próximamente");
+            }}
+            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
+          >
+            <Shield className="h-5 w-5 text-muted-foreground" />
+            <span className="flex-1">Política de privacidad</span>
+          </a>
+          <div className="ml-12 h-px bg-glass-border" />
+          <button
+            onClick={() => setConfirmLogout(true)}
+            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
+          >
+            <LogOut className="h-5 w-5 text-muted-foreground" />
+            <span className="flex-1">Cerrar sesión</span>
+          </button>
+        </div>
+
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-3xl glass-subtle py-4 text-sm font-medium text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4" /> Eliminar cuenta
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={confirmLogout}
+        onOpenChange={setConfirmLogout}
+        title="Cerrar sesión"
+        description="Tendrás que volver a iniciar sesión para acceder a tus chats y archivos."
+        confirmLabel="Cerrar sesión"
+        onConfirm={logout}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Eliminar cuenta"
+        description="Se eliminarán tu perfil, contactos, mensajes y archivos. Esta acción es irreversible."
+        confirmLabel="Eliminar todo"
+        destructive
+        onConfirm={deleteAccount}
+      />
+    </>
+  );
+}
