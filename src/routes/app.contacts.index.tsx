@@ -258,7 +258,7 @@ function Contacts() {
         }
         confirmLabel="Eliminar"
         destructive
-        onConfirm={() => confirmDel && remove(confirmDel)}
+        onConfirm={async () => { if (confirmDel) await remove(confirmDel); }}
       />
     </>
   );

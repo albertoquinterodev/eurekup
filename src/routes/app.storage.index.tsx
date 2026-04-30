@@ -421,7 +421,7 @@ function Storage() {
         }
         destructive
         confirmLabel="Eliminar"
-        onConfirm={() => confirmDelFile && deleteFile(confirmDelFile)}
+        onConfirm={async () => { if (confirmDelFile) await deleteFile(confirmDelFile); }}
       />
       <ConfirmDialog
         open={!!confirmDelFolder}
@@ -434,7 +434,7 @@ function Storage() {
         }
         destructive
         confirmLabel="Eliminar"
-        onConfirm={() => confirmDelFolder && deleteFolder(confirmDelFolder)}
+        onConfirm={async () => { if (confirmDelFolder) await deleteFolder(confirmDelFolder); }}
       />
 
       {/* Rename modal */}
