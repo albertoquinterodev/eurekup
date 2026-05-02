@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Upload,
   FileText,
@@ -12,12 +13,17 @@ import {
   Pencil,
   FolderPlus,
   Folder,
+  FolderOpen,
   Loader2,
+  ChevronRight,
+  Plus,
+  HardDrive,
+  Layers,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
-import { Fab } from "@/components/fab";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatBytes, formatTime } from "@/lib/format";
 
@@ -53,7 +59,7 @@ function Storage() {
   const { user } = useAuth();
   const [files, setFiles] = useState<FileRow[]>([]);
   const [folders, setFolders] = useState<FolderRow[]>([]);
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -61,9 +67,14 @@ function Storage() {
   const [confirmDelFolder, setConfirmDelFolder] = useState<FolderRow | null>(null);
   const [renameTarget, setRenameTarget] = useState<FileRow | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState<{ parent: string | null } | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
-  const [dragOver, setDragOver] = useState(false);
+  const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const [showInternalPicker, setShowInternalPicker] = useState(false);
+  const [internalTargetFolder, setInternalTargetFolder] = useState<string | null>(null);
+  const [pendingUploadFolder, setPendingUploadFolder] = useState<string | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
+  const [draggingFileId, setDraggingFileId] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ used: number; total: number }>({ used: 0, total: 5368709120 });
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,19 +99,38 @@ function Storage() {
     load();
   }, [load]);
 
-  const visibleFiles = files.filter((f) => f.folder_id === currentFolder);
-  const visibleFolders = folders.filter((f) => f.parent_id === currentFolder);
-  const breadcrumb = (() => {
-    const out: FolderRow[] = [];
-    let cur = folders.find((f) => f.id === currentFolder) ?? null;
-    while (cur) {
-      out.unshift(cur);
-      cur = folders.find((f) => f.id === cur!.parent_id) ?? null;
+  // Build a map: parent_id -> folders[], parent_id (folder or null) -> files[]
+  const childFolders = useMemo(() => {
+    const map = new Map<string | null, FolderRow[]>();
+    for (const f of folders) {
+      const k = f.parent_id;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
     }
-    return out;
-  })();
+    for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
+    return map;
+  }, [folders]);
 
-  const upload = async (fileList: FileList | File[]) => {
+  const filesIn = useMemo(() => {
+    const map = new Map<string | null, FileRow[]>();
+    for (const f of files) {
+      const k = f.folder_id;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
+    }
+    return map;
+  }, [files]);
+
+  const toggleExpand = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const upload = async (fileList: FileList | File[], folderId: string | null) => {
     if (!user) return;
     const arr = Array.from(fileList);
     if (!arr.length) return;
@@ -125,7 +155,7 @@ function Storage() {
         if (upErr) throw upErr;
         const { error: dbErr } = await supabase.from("files").insert({
           owner_id: user.id,
-          folder_id: currentFolder,
+          folder_id: folderId,
           name: f.name,
           storage_path: path,
           mime_type: f.type || null,
@@ -142,15 +172,24 @@ function Storage() {
     }
     setUploading(false);
     setProgress(0);
+    if (folderId) setExpanded((prev) => new Set(prev).add(folderId));
     load();
   };
 
-  const onPickFile = () => inputRef.current?.click();
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer?.files?.length) upload(e.dataTransfer.files);
+  const moveFileToFolder = async (fileId: string, folderId: string | null) => {
+    const file = files.find((f) => f.id === fileId);
+    if (!file || file.folder_id === folderId) return;
+    // Optimistic update
+    setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, folder_id: folderId } : f)));
+    const { error } = await supabase.from("files").update({ folder_id: folderId }).eq("id", fileId);
+    if (error) {
+      toast.error("No se pudo mover");
+      // revert
+      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, folder_id: file.folder_id } : f)));
+      return;
+    }
+    if (folderId) setExpanded((prev) => new Set(prev).add(folderId));
+    toast.success(`Movido a ${folderId ? folders.find((x) => x.id === folderId)?.name ?? "carpeta" : "Inicio"}`);
   };
 
   const deleteFile = async (f: FileRow) => {
@@ -196,7 +235,7 @@ function Storage() {
   };
 
   const createFolder = async () => {
-    if (!user) return;
+    if (!user || !showNewFolder) return;
     const name = newFolderName.trim();
     if (!name) {
       toast.error("Nombre requerido");
@@ -204,7 +243,7 @@ function Storage() {
     }
     const { data, error } = await supabase
       .from("folders")
-      .insert({ owner_id: user.id, parent_id: currentFolder, name })
+      .insert({ owner_id: user.id, parent_id: showNewFolder.parent, name })
       .select("id, name, parent_id")
       .single();
     if (error) {
@@ -212,7 +251,8 @@ function Storage() {
       return;
     }
     setFolders((prev) => [...prev, data]);
-    setShowNewFolder(false);
+    if (showNewFolder.parent) setExpanded((prev) => new Set(prev).add(showNewFolder.parent!));
+    setShowNewFolder(null);
     setNewFolderName("");
     toast.success("Carpeta creada");
   };
@@ -228,13 +268,205 @@ function Storage() {
     load();
   };
 
+  const onPickFromDevice = (folderId: string | null) => {
+    setPendingUploadFolder(folderId);
+    setShowSourcePicker(false);
+    // Defer to next tick so the input picks up before the modal unmounts
+    setTimeout(() => inputRef.current?.click(), 0);
+  };
+
+  const onPickFromInternal = (folderId: string | null) => {
+    setInternalTargetFolder(folderId);
+    setShowSourcePicker(false);
+    setShowInternalPicker(true);
+  };
+
+  const copyFromInternal = async (sourceFile: FileRow) => {
+    if (sourceFile.folder_id === internalTargetFolder) {
+      toast.message("El archivo ya está en esta carpeta");
+      return;
+    }
+    await moveFileToFolder(sourceFile.id, internalTargetFolder);
+    setShowInternalPicker(false);
+  };
+
   const usedPct = Math.min(100, (quota.used / quota.total) * 100);
+
+  const rootFolders = childFolders.get(null) ?? [];
+  const rootFiles = filesIn.get(null) ?? [];
+
+  // Recursive folder tree row.
+  const FolderNode = ({ folder, depth }: { folder: FolderRow; depth: number }) => {
+    const isOpen = expanded.has(folder.id);
+    const subs = childFolders.get(folder.id) ?? [];
+    const ff = filesIn.get(folder.id) ?? [];
+    const empty = subs.length === 0 && ff.length === 0;
+    const isDropTarget = dragOverFolder === folder.id;
+    return (
+      <div>
+        <div
+          onDragOver={(e) => {
+            if (draggingFileId) {
+              e.preventDefault();
+              setDragOverFolder(folder.id);
+            }
+          }}
+          onDragLeave={() => setDragOverFolder((cur) => (cur === folder.id ? null : cur))}
+          onDrop={async (e) => {
+            e.preventDefault();
+            setDragOverFolder(null);
+            if (draggingFileId) {
+              await moveFileToFolder(draggingFileId, folder.id);
+              setDraggingFileId(null);
+            } else if (e.dataTransfer?.files?.length) {
+              upload(e.dataTransfer.files, folder.id);
+            }
+          }}
+          className={`group flex items-center gap-2 rounded-2xl px-2 py-2 transition ${
+            isDropTarget ? "bg-primary/15 ring-2 ring-primary/50" : "hover:bg-glass"
+          }`}
+          style={{ paddingLeft: `${depth * 14 + 8}px` }}
+        >
+          <button
+            onClick={() => toggleExpand(folder.id)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-glass-strong hover:text-foreground"
+            aria-label={isOpen ? "Cerrar" : "Abrir"}
+          >
+            <motion.span animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
+              <ChevronRight className="h-4 w-4" />
+            </motion.span>
+          </button>
+          <button
+            onClick={() => toggleExpand(folder.id)}
+            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-glass-strong">
+              {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+            </div>
+            <span className="truncate text-sm font-medium">{folder.name}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {ff.length + subs.length || ""}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setShowNewFolder({ parent: folder.id });
+            }}
+            className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+            aria-label="Nueva subcarpeta"
+          >
+            <FolderPlus className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setPendingUploadFolder(folder.id);
+              setShowSourcePicker(true);
+            }}
+            className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+            aria-label="Añadir aquí"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setConfirmDelFolder(folder)}
+            className="hidden h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 group-hover:flex"
+            aria-label="Eliminar carpeta"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              key="content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-1 py-1">
+                {empty && (
+                  <div
+                    className="rounded-xl px-2 py-3 text-xs text-muted-foreground"
+                    style={{ paddingLeft: `${(depth + 1) * 14 + 8}px` }}
+                  >
+                    Vacía. Arrastra archivos aquí o pulsa <span className="text-foreground">+</span>.
+                  </div>
+                )}
+                {subs.map((s) => (
+                  <FolderNode key={s.id} folder={s} depth={depth + 1} />
+                ))}
+                {ff.map((file) => (
+                  <FileRowItem key={file.id} file={file} depth={depth + 1} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const FileRowItem = ({ file, depth }: { file: FileRow; depth: number }) => {
+    const Icon = iconFor(file.mime_type);
+    return (
+      <div
+        draggable
+        onDragStart={(e) => {
+          setDraggingFileId(file.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => setDraggingFileId(null)}
+        className={`group flex items-center gap-2 rounded-2xl px-2 py-2 transition hover:bg-glass ${
+          draggingFileId === file.id ? "opacity-50" : ""
+        }`}
+        style={{ paddingLeft: `${depth * 14 + 36}px` }}
+      >
+        <button onClick={() => openFile(file)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-glass-strong">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm">{file.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatBytes(file.size_bytes)} · {formatTime(file.created_at)}
+            </p>
+          </div>
+        </button>
+        <button
+          onClick={() => openFile(file)}
+          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          aria-label="Descargar"
+        >
+          <Download className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => {
+            setRenameTarget(file);
+            setRenameValue(file.name);
+          }}
+          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          aria-label="Renombrar"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setConfirmDelFile(file)}
+          className="hidden h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 group-hover:flex"
+          aria-label="Eliminar"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <>
       <AppBar title="Archivos" subtitle="Tu Drive personal" />
 
-      {/* Quota card */}
       <div className="px-3 pt-3">
         <div className="glass rounded-3xl p-5">
           <div className="flex items-baseline justify-between">
@@ -253,161 +485,96 @@ function Storage() {
         </div>
       </div>
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1 px-5 pt-4 text-sm text-muted-foreground">
-        <button
-          onClick={() => setCurrentFolder(null)}
-          className={`hover:text-foreground ${currentFolder === null ? "text-foreground font-medium" : ""}`}
-        >
-          Inicio
-        </button>
-        {breadcrumb.map((b) => (
-          <span key={b.id} className="flex items-center gap-1">
-            <span className="text-muted-foreground/60">/</span>
-            <button
-              onClick={() => setCurrentFolder(b.id)}
-              className="hover:text-foreground text-foreground font-medium"
-            >
-              {b.name}
-            </button>
-          </span>
-        ))}
-      </div>
-
-      {/* Drop zone + grid */}
+      {/* Tree root with drop zone */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setDragOver(true);
+          setDragOverFolder("root");
         }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        className={`mx-3 mt-3 rounded-3xl border-2 border-dashed transition ${
-          dragOver ? "border-primary bg-glass-strong" : "border-transparent"
+        onDragLeave={() => setDragOverFolder((cur) => (cur === "root" ? null : cur))}
+        onDrop={async (e) => {
+          e.preventDefault();
+          setDragOverFolder(null);
+          if (draggingFileId) {
+            await moveFileToFolder(draggingFileId, null);
+            setDraggingFileId(null);
+          } else if (e.dataTransfer?.files?.length) {
+            upload(e.dataTransfer.files, null);
+          }
+        }}
+        className={`mx-3 mt-3 rounded-3xl border-2 border-dashed p-2 transition ${
+          dragOverFolder === "root" ? "border-primary bg-glass" : "border-transparent"
         }`}
       >
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : visibleFolders.length === 0 && visibleFiles.length === 0 ? (
-          <div className="glass rounded-3xl px-6 py-16 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-glass-strong">
-              <Upload className="h-5 w-5" />
+        <div className="glass rounded-3xl p-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-            <p className="mt-3 font-medium">Carpeta vacía</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Arrastra archivos aquí o usa el botón <span className="text-foreground">+</span>.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2 p-1">
-            {visibleFolders.map((f) => (
-              <div
-                key={f.id}
-                className="glass flex items-center gap-3 rounded-2xl p-3 transition hover:bg-glass-strong"
-              >
-                <button
-                  onClick={() => setCurrentFolder(f.id)}
-                  className="flex flex-1 items-center gap-3 text-left"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-glass-strong">
-                    <Folder className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{f.name}</p>
-                    <p className="text-xs text-muted-foreground">Carpeta</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setConfirmDelFolder(f)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
-                  aria-label="Eliminar carpeta"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+          ) : rootFolders.length === 0 && rootFiles.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-glass-strong">
+                <Upload className="h-5 w-5" />
               </div>
-            ))}
-            {visibleFiles.map((f) => {
-              const Icon = iconFor(f.mime_type);
-              return (
-                <div
-                  key={f.id}
-                  className="glass flex items-center gap-3 rounded-2xl p-3 transition hover:bg-glass-strong"
-                >
-                  <button onClick={() => openFile(f)} className="flex flex-1 items-center gap-3 text-left">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-glass-strong">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{f.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatBytes(f.size_bytes)} · {formatTime(f.created_at)}
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => openFile(f)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-glass-strong"
-                    aria-label="Descargar"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRenameTarget(f);
-                      setRenameValue(f.name);
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-glass-strong"
-                    aria-label="Renombrar"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelFile(f)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
-                    aria-label="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+              <p className="mt-3 font-medium">Carpeta vacía</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Arrastra archivos aquí o usa el botón <span className="text-foreground">+</span>.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {rootFolders.map((f) => (
+                <FolderNode key={f.id} folder={f} depth={0} />
+              ))}
+              {rootFiles.map((file) => (
+                <FileRowItem key={file.id} file={file} depth={0} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden device file input */}
       <input
         ref={inputRef}
         type="file"
         multiple
         className="hidden"
         onChange={(e) => {
-          if (e.target.files?.length) upload(e.target.files);
+          if (e.target.files?.length) upload(e.target.files, pendingUploadFolder);
+          setPendingUploadFolder(null);
           e.target.value = "";
         }}
       />
 
       {/* Upload progress */}
       {uploading && (
-        <div className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2">
+        <div className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2">
           <div className="glass-strong flex items-center gap-3 rounded-full px-5 py-3 text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Subiendo… {progress}%
           </div>
         </div>
       )}
 
-      {/* Action sheet */}
+      {/* Floating action — root level */}
       <div className="fixed bottom-24 right-5 z-40 flex flex-col items-end gap-3">
         <button
-          onClick={() => setShowNewFolder(true)}
+          onClick={() => setShowNewFolder({ parent: null })}
           className="glass-strong flex h-12 w-12 items-center justify-center rounded-full text-foreground"
           aria-label="Nueva carpeta"
         >
           <FolderPlus className="h-5 w-5" />
         </button>
-        <Fab onClick={onPickFile} icon={Upload} label="Subir archivo" />
+        <button
+          onClick={() => {
+            setPendingUploadFolder(null);
+            setShowSourcePicker(true);
+          }}
+          className="flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-elevated transition active:scale-95"
+          aria-label="Añadir archivo"
+        >
+          <Plus className="h-5 w-5" /> Añadir
+        </button>
       </div>
 
       <ConfirmDialog
@@ -429,13 +596,92 @@ function Storage() {
         title="Eliminar carpeta"
         description={
           <>
-            ¿Eliminar la carpeta <span className="text-foreground font-medium">{confirmDelFolder?.name}</span>? Los archivos quedarán sueltos en la raíz.
+            ¿Eliminar la carpeta <span className="text-foreground font-medium">{confirmDelFolder?.name}</span>? Los archivos quedarán en Inicio.
           </>
         }
         destructive
         confirmLabel="Eliminar"
         onConfirm={async () => { if (confirmDelFolder) await deleteFolder(confirmDelFolder); }}
       />
+
+      {/* Source picker */}
+      {showSourcePicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowSourcePicker(false)} />
+          <div className="glass-strong relative w-full max-w-sm rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Añadir archivo</h2>
+              <button onClick={() => setShowSourcePicker(false)} className="rounded-full p-1.5 hover:bg-glass">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Elige una fuente.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onPickFromDevice(pendingUploadFolder)}
+                className="glass-subtle flex flex-col items-center gap-2 rounded-2xl p-5 text-center hover:bg-glass"
+              >
+                <HardDrive className="h-6 w-6" />
+                <span className="text-sm font-medium">Dispositivo</span>
+                <span className="text-xs text-muted-foreground">Archivos locales</span>
+              </button>
+              <button
+                onClick={() => onPickFromInternal(pendingUploadFolder)}
+                className="glass-subtle flex flex-col items-center gap-2 rounded-2xl p-5 text-center hover:bg-glass"
+              >
+                <Layers className="h-6 w-6" />
+                <span className="text-sm font-medium">Eurekup</span>
+                <span className="text-xs text-muted-foreground">Almacén interno</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Internal file picker */}
+      {showInternalPicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowInternalPicker(false)} />
+          <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Selecciona un archivo</h2>
+              <button onClick={() => setShowInternalPicker(false)} className="rounded-full p-1.5 hover:bg-glass">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Se moverá a la carpeta seleccionada.
+            </p>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              {files.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">No tienes archivos aún.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {files.map((f) => {
+                    const Icon = iconFor(f.mime_type);
+                    return (
+                      <li key={f.id}>
+                        <button
+                          onClick={() => copyFromInternal(f)}
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left hover:bg-glass"
+                        >
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{f.name}</p>
+                            <p className="text-xs text-muted-foreground">{formatBytes(f.size_bytes)}</p>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rename modal */}
       {renameTarget && (
@@ -465,9 +711,14 @@ function Storage() {
       {/* New folder */}
       {showNewFolder && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowNewFolder(false)} />
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowNewFolder(null)} />
           <div className="glass-strong relative w-full max-w-sm rounded-3xl p-6 animate-slide-up">
             <h2 className="text-lg font-semibold">Nueva carpeta</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {showNewFolder.parent
+                ? `Dentro de ${folders.find((f) => f.id === showNewFolder.parent)?.name ?? "carpeta"}`
+                : "En Inicio"}
+            </p>
             <input
               autoFocus
               value={newFolderName}
@@ -477,7 +728,7 @@ function Storage() {
               className="mt-4 w-full rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="mt-5 flex gap-2">
-              <button onClick={() => setShowNewFolder(false)} className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium">
+              <button onClick={() => setShowNewFolder(null)} className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium">
                 Cancelar
               </button>
               <button onClick={createFolder} className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground">

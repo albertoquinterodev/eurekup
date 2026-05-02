@@ -2,9 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy } from "lucide-react";
+import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { AppBar } from "@/components/app-bar";
 import { Avatar } from "@/components/avatar-bubble";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -23,6 +24,7 @@ interface Profile {
 
 function Settings() {
   const { user, signOut } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [quota, setQuota] = useState({ used: 0, total: 0 });
@@ -74,9 +76,9 @@ function Settings() {
         }
       } else {
         // Open mailto so user can send the invitation right away
-        const subject = encodeURIComponent("Te invito a Nebula");
+        const subject = encodeURIComponent("Te invito a Eurekup");
         const body = encodeURIComponent(
-          `Hola,\n\nQuiero invitarte a Nebula, una app que combina chats y archivos.\nÚsa mi código de referido al registrarte: ${profile.referral_code}\n\nÚnete: ${window.location.origin}/auth\n\n— ${profile.display_name}`
+          `Hola,\n\nQuiero invitarte a Eurekup, una app que combina chats y archivos.\nUsa mi código de referido al registrarte: ${profile.referral_code}\n\nÚnete: ${window.location.origin}/auth\n\n— ${profile.display_name}`
         );
         window.location.href = `mailto:${target}?subject=${subject}&body=${body}`;
         setReferrals((r) => ({ ...r, pending: r.pending + 1 }));
@@ -200,6 +202,19 @@ function Settings() {
 
         {/* Actions */}
         <div className="glass rounded-3xl overflow-hidden">
+          <button
+            onClick={toggleTheme}
+            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <Moon className="h-5 w-5 text-muted-foreground" />
+            )}
+            <span className="flex-1">Modo {theme === "dark" ? "claro" : "oscuro"}</span>
+            <span className="text-xs text-muted-foreground">{theme === "dark" ? "Oscuro" : "Claro"}</span>
+          </button>
+          <div className="ml-12 h-px bg-glass-border" />
           <button
             onClick={() => navigate({ to: "/app/channels" })}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
