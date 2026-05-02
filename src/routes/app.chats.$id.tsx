@@ -327,7 +327,7 @@ function ChatRoom() {
   };
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
       <header className="shrink-0 safe-top">
         <div className="glass mx-3 mt-3 flex items-center gap-3 rounded-3xl px-3 py-2.5">
