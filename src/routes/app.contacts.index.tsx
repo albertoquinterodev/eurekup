@@ -176,35 +176,8 @@ function Contacts() {
   };
 
   const startChat = async (c: Contact) => {
-    if (!user) return;
-    // find or create direct conversation
-    const { data: mine } = await supabase
-      .from("conversation_members")
-      .select("conversation_id, conversations!inner(kind)")
-      .eq("user_id", user.id);
-    const ids = (mine ?? []).filter((m) => (m.conversations as { kind: string }).kind === "direct").map((m) => m.conversation_id);
-    let convId: string | null = null;
-    if (ids.length) {
-      const { data: peers } = await supabase
-        .from("conversation_members")
-        .select("conversation_id")
-        .eq("user_id", c.contact_user_id)
-        .in("conversation_id", ids);
-      convId = peers?.[0]?.conversation_id ?? null;
-    }
-    if (!convId) {
-      const { data: conv, error } = await supabase.from("conversations").insert({ kind: "direct" }).select("id").single();
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      convId = conv.id;
-      await supabase.from("conversation_members").insert([
-        { conversation_id: convId, user_id: user.id },
-        { conversation_id: convId, user_id: c.contact_user_id },
-      ]);
-    }
-    navigate({ to: "/app/chats/$id", params: { id: convId! } });
+    const convId = await ensureDirectConv(c.contact_user_id);
+    if (convId) navigate({ to: "/app/chats/$id", params: { id: convId } });
   };
 
   return (
@@ -227,22 +200,28 @@ function Contacts() {
           <ul className="glass rounded-3xl overflow-hidden">
             {contacts.map((c, i) => (
               <li key={c.id}>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <Avatar name={c.profile.display_name} url={c.profile.avatar_url} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{c.profile.display_name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{c.profile.email}</p>
-                  </div>
+                <div className="flex items-center gap-3 px-4 py-3 transition hover:bg-glass-strong">
                   <button
                     onClick={() => startChat(c)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-glass-strong"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    aria-label={`Abrir chat con ${c.profile.display_name}`}
+                  >
+                    <Avatar name={c.profile.display_name} url={c.profile.avatar_url} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{c.profile.display_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{c.profile.email}</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => startChat(c)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
                     aria-label="Chatear"
                   >
                     <MessageSquare className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDel(c)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
                     aria-label="Eliminar"
                   >
                     <Trash2 className="h-4 w-4" />
