@@ -56,6 +56,48 @@ function Contacts() {
     load();
   }, [user]);
 
+  // Find or create a direct conversation between current user and a peer.
+  const ensureDirectConv = async (peerId: string): Promise<string | null> => {
+    if (!user) return null;
+    const { data: mine } = await supabase
+      .from("conversation_members")
+      .select("conversation_id, conversations!inner(kind)")
+      .eq("user_id", user.id);
+    const ids = (mine ?? [])
+      .filter((m) => (m.conversations as { kind: string }).kind === "direct")
+      .map((m) => m.conversation_id);
+    let convId: string | null = null;
+    if (ids.length) {
+      const { data: peers } = await supabase
+        .from("conversation_members")
+        .select("conversation_id")
+        .eq("user_id", peerId)
+        .in("conversation_id", ids);
+      convId = peers?.[0]?.conversation_id ?? null;
+    }
+    if (!convId) {
+      const { data: conv, error } = await supabase
+        .from("conversations")
+        .insert({ kind: "direct" })
+        .select("id")
+        .single();
+      if (error) {
+        toast.error(error.message);
+        return null;
+      }
+      convId = conv.id;
+      const { error: mErr } = await supabase.from("conversation_members").insert([
+        { conversation_id: convId, user_id: user.id },
+        { conversation_id: convId, user_id: peerId },
+      ]);
+      if (mErr) {
+        toast.error(mErr.message);
+        return null;
+      }
+    }
+    return convId;
+  };
+
   const addContact = async () => {
     const parsed = emailSchema.safeParse(email);
     if (!parsed.success) {
@@ -66,7 +108,6 @@ function Contacts() {
     setAdding(true);
     try {
       const target = parsed.data.toLowerCase();
-      // Find profile by email
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
         .select("id, display_name, email, avatar_url")
@@ -82,7 +123,6 @@ function Contacts() {
         toast.error("No puedes añadirte a ti mismo");
         return;
       }
-      // Check duplicate (DB also enforces it via UNIQUE)
       const { data: existing } = await supabase
         .from("contacts")
         .select("id")
@@ -91,8 +131,11 @@ function Contacts() {
         .maybeSingle();
       if (existing) {
         toast.message("Ya tienes este contacto");
+        // still ensure a conversation and navigate
+        const convId = await ensureDirectConv(profile.id);
         setShowAdd(false);
         setEmail("");
+        if (convId) navigate({ to: "/app/chats/$id", params: { id: convId } });
         return;
       }
       const { data: inserted, error } = await supabase
@@ -109,9 +152,12 @@ function Contacts() {
         },
         ...prev,
       ]);
+      // Auto-create chat instance and jump into it.
+      const convId = await ensureDirectConv(profile.id);
       toast.success(`${profile.display_name} añadido`);
       setShowAdd(false);
       setEmail("");
+      if (convId) navigate({ to: "/app/chats/$id", params: { id: convId } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al añadir");
     } finally {
