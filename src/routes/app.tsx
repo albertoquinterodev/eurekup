@@ -25,10 +25,12 @@ function AppLayout() {
     );
   }
 
-  // Full dynamic viewport, scrollable inner content, fixed bottom nav padding.
+  // Container locked to dynamic viewport height. Each child route handles its own
+  // internal scroll (chat list, drive, settings) so the bottom nav never overlaps
+  // and content never escapes the viewport on mobile (iOS Safari URL bar safe).
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto pb-28">
+    <div className="relative h-dvh overflow-hidden">
+      <div className="h-full overflow-y-auto pb-24">
         <Outlet />
       </div>
       <BottomNav />
