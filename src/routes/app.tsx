@@ -25,14 +25,11 @@ function AppLayout() {
     );
   }
 
-  // Container locked to dynamic viewport height. Each child route handles its own
-  // internal scroll (chat list, drive, settings) so the bottom nav never overlaps
-  // and content never escapes the viewport on mobile (iOS Safari URL bar safe).
+  // Single dynamic-viewport scroll container. Routes that need their own scroll
+  // (e.g. chat room) render full-bleed via fixed positioning and bypass this scroll.
   return (
-    <div className="relative h-dvh overflow-hidden">
-      <div className="h-full overflow-y-auto pb-24">
-        <Outlet />
-      </div>
+    <div className="relative h-dvh overflow-y-auto pb-24">
+      <Outlet />
       <BottomNav />
     </div>
   );
