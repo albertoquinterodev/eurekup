@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { EurekupLogo } from "@/components/eurekup-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -64,19 +66,20 @@ function AuthPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-5 py-10">
+    <div className="relative flex min-h-dvh items-center justify-center px-5 py-10">
       <Link
         to="/"
         className="glass absolute left-5 top-5 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Volver
       </Link>
+      <div className="absolute right-5 top-5">
+        <ThemeToggle />
+      </div>
       <div className="glass-strong w-full max-w-md rounded-[2rem] p-8 animate-slide-up">
         <div className="mb-8 text-center">
-          <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Nebula
-          </span>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+          <EurekupLogo className="mx-auto h-10 w-auto" />
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight">
             {mode === "signin" ? "Bienvenido" : "Crea tu cuenta"}
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">

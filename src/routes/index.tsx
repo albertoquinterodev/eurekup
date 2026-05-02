@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { MessagesSquare, FolderClosed, Users, Sparkles, ArrowRight, Lock } from "lucide-react";
+import { MessagesSquare, FolderClosed, Sparkles, ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { EurekupLogo } from "@/components/eurekup-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -16,34 +18,35 @@ function Landing() {
   }, [loading, user, navigate]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Hero */}
-      <section className="mx-auto max-w-6xl px-5 pt-14 pb-24 sm:pt-24">
-        <nav className="glass mx-auto mb-16 flex max-w-3xl items-center justify-between rounded-full px-4 py-2.5">
-          <span className="flex items-center gap-2 px-2 font-semibold tracking-tight">
-            <span className="h-2 w-2 rounded-full bg-primary" />
-            Nebula
-          </span>
-          <Link
-            to="/auth"
-            className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground"
-          >
-            Entrar
+    <div className="relative min-h-dvh overflow-x-hidden">
+      <section className="mx-auto max-w-6xl px-5 pt-6 pb-24 sm:pt-10">
+        <nav className="glass mx-auto mb-12 flex max-w-3xl items-center justify-between gap-3 rounded-full px-3 py-2 sm:px-4 sm:py-2.5">
+          <Link to="/" className="flex items-center gap-2 px-1">
+            <EurekupLogo className="h-7 w-auto sm:h-8" />
           </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link
+              to="/auth"
+              className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground"
+            >
+              Entrar
+            </Link>
+          </div>
         </nav>
 
         <div className="text-center">
           <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs text-muted-foreground">
             <Sparkles className="h-3 w-3" /> Liquid Glass · Realtime · Privado
           </span>
-          <h1 className="mt-6 text-balance text-5xl font-bold tracking-tight sm:text-7xl">
+          <h1 className="mt-6 text-balance text-4xl font-bold tracking-tight sm:text-7xl">
             Tus chats y archivos,
             <br />
             <span className="text-muted-foreground">en una sola app.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-balance text-base text-muted-foreground sm:text-lg">
             Mensajería en tiempo real con la potencia de un Drive privado.
-            Diseño minimalista, controles claros y +1GB gratis por cada amigo invitado.
+            Diseño minimalista, controles claros y +1 GB gratis por cada amigo invitado.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
@@ -61,8 +64,7 @@ function Landing() {
           </div>
         </div>
 
-        {/* Hero card preview */}
-        <div className="relative mx-auto mt-20 max-w-3xl">
+        <div className="relative mx-auto mt-16 max-w-3xl sm:mt-20">
           <div className="glass-strong rounded-[2rem] p-3">
             <div className="rounded-3xl bg-card/40 p-6">
               <div className="flex items-center gap-3 border-b border-glass-border pb-4">
@@ -97,7 +99,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="mx-auto max-w-6xl px-5 pb-32">
         <div className="grid gap-4 sm:grid-cols-3">
           {[
@@ -115,7 +116,7 @@ function Landing() {
           ))}
         </div>
 
-        <div className="glass-strong mt-10 flex flex-col items-center gap-5 rounded-[2rem] p-10 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div className="glass-strong mt-10 flex flex-col items-center gap-5 rounded-[2rem] p-8 text-center sm:flex-row sm:justify-between sm:p-10 sm:text-left">
           <div>
             <h3 className="text-2xl font-semibold tracking-tight">Invita y crece tu espacio</h3>
             <p className="mt-1.5 text-sm text-muted-foreground">
