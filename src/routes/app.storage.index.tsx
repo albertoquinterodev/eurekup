@@ -465,23 +465,29 @@ function Storage() {
 
   return (
     <>
-      <AppBar title="Archivos" subtitle="Tu Drive personal" />
-
-      <div className="px-3 pt-3">
-        <div className="glass rounded-3xl p-5">
-          <div className="flex items-baseline justify-between">
-            <p className="text-sm text-muted-foreground">Almacenamiento</p>
-            <p className="text-sm">
-              <span className="font-semibold">{formatBytes(quota.used)}</span>{" "}
-              <span className="text-muted-foreground">/ {formatBytes(quota.total)}</span>
-            </p>
-          </div>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-glass">
+      <AppBar
+        title="Archivos"
+        subtitle={`${formatBytes(quota.used)} de ${formatBytes(quota.total)} · ${Math.round(usedPct)}%`}
+        rightSlot={
+          <div
+            className="ml-1 hidden h-1.5 w-24 overflow-hidden rounded-full bg-glass sm:block"
+            aria-hidden
+          >
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${usedPct}%` }}
             />
           </div>
+        }
+      />
+
+      {/* Mobile-only thin progress under app bar */}
+      <div className="px-6 pt-2 sm:hidden">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-glass">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${usedPct}%` }}
+          />
         </div>
       </div>
 
