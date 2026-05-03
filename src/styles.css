@@ -177,6 +177,7 @@
 
   html, body, #root {
     height: 100%;
+    overflow-x: hidden;
   }
 
   body {
@@ -189,6 +190,7 @@
     background-image: var(--gradient-radial), var(--gradient-radial-2);
     background-attachment: fixed;
     overscroll-behavior: none;
+    max-width: 100vw;
   }
 
   ::selection {
