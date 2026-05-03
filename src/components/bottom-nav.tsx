@@ -12,8 +12,8 @@ const items = [
 export function BottomNav() {
   const location = useLocation();
   return (
-    <nav className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 safe-bottom">
-      <div className="glass-strong flex items-center gap-1 rounded-full p-1.5">
+    <nav className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 safe-bottom max-w-[calc(100vw-1rem)]">
+      <div className="frost-surface flex items-center gap-1 rounded-full border border-glass-border p-1.5 shadow-elevated backdrop-blur-2xl backdrop-saturate-200">
         {items.map((it) => {
           const active = location.pathname.startsWith(it.to);
           const Icon = it.icon;
