@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MessageCirclePlus, Hash, Loader2 } from "lucide-react";
+import { MessageCirclePlus, Hash, Loader2, X, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
@@ -26,13 +26,22 @@ interface ChatItem {
   is_channel: boolean;
 }
 
+interface ContactPick {
+  contact_user_id: string;
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
 function ChatsList() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [contacts, setContacts] = useState<ContactPick[]>([]);
+  const [busyContactId, setBusyContactId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -107,28 +116,39 @@ function ChatsList() {
     };
   }, [user]);
 
-  const startNewChat = async () => {
-    setCreating(true);
-    try {
-      const { data: contacts } = await supabase
-        .from("contacts")
-        .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name)")
-        .eq("owner_id", user!.id)
-        .limit(20);
+  const openPicker = async () => {
+    if (!user) return;
+    setPicker(true);
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, email, avatar_url)")
+      .eq("owner_id", user.id);
+    if (error) {
+      toast.error("No se pudieron cargar contactos");
+      return;
+    }
+    setContacts(
+      (data ?? []).map((d) => ({
+        contact_user_id: d.contact_user_id,
+        display_name: (d.profiles as { display_name: string }).display_name,
+        email: (d.profiles as { email: string }).email,
+        avatar_url: (d.profiles as { avatar_url: string | null }).avatar_url,
+      }))
+    );
+  };
 
-      if (!contacts || contacts.length === 0) {
-        toast.message("Añade contactos primero", { description: "Ve a Contactos para empezar a chatear." });
-        navigate({ to: "/app/contacts" });
-        return;
-      }
-      // Ask via simple prompt for v1
-      const peerId = contacts[0].contact_user_id;
-      // Find existing direct conv
+  const startWith = async (peerId: string) => {
+    if (!user) return;
+    setBusyContactId(peerId);
+    try {
+      // Find existing direct conversation with this peer.
       const { data: mine } = await supabase
         .from("conversation_members")
         .select("conversation_id, conversations!inner(kind)")
-        .eq("user_id", user!.id);
-      const myConvIds = (mine ?? []).filter((m) => (m.conversations as { kind: string }).kind === "direct").map((m) => m.conversation_id);
+        .eq("user_id", user.id);
+      const myConvIds = (mine ?? [])
+        .filter((m) => (m.conversations as { kind: string }).kind === "direct")
+        .map((m) => m.conversation_id);
       let existing: string | null = null;
       if (myConvIds.length) {
         const { data: peerMembers } = await supabase
@@ -147,25 +167,24 @@ function ChatsList() {
           .single();
         if (error) throw error;
         convId = conv.id;
-        const { error: mErr } = await supabase
-          .from("conversation_members")
-          .insert([
-            { conversation_id: convId, user_id: user!.id },
-            { conversation_id: convId, user_id: peerId },
-          ]);
+        const { error: mErr } = await supabase.from("conversation_members").insert([
+          { conversation_id: convId, user_id: user.id },
+          { conversation_id: convId, user_id: peerId },
+        ]);
         if (mErr) throw mErr;
       }
+      setPicker(false);
       navigate({ to: "/app/chats/$id", params: { id: convId! } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al crear chat");
     } finally {
-      setCreating(false);
+      setBusyContactId(null);
     }
   };
 
   const filtered = chats.filter((c) => {
     if (filter === "personal") return !c.is_channel;
-    if (filter === "unread") return false; // future: unread tracking
+    if (filter === "unread") return false;
     return true;
   });
 
@@ -220,7 +239,56 @@ function ChatsList() {
         )}
       </div>
 
-      <Fab onClick={startNewChat} icon={creating ? Loader2 : MessageCirclePlus} label="Nuevo chat" />
+      <Fab onClick={openPicker} icon={MessageCirclePlus} label="Nuevo chat" />
+
+      {picker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setPicker(false)} />
+          <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Nuevo chat</h2>
+              <button onClick={() => setPicker(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Elige un contacto para empezar.</p>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              {contacts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-sm text-muted-foreground">No tienes contactos todavía.</p>
+                  <button
+                    onClick={() => { setPicker(false); navigate({ to: "/app/contacts" }); }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                  >
+                    <UserPlus className="h-4 w-4" /> Añadir contacto
+                  </button>
+                </div>
+              ) : (
+                <ul className="space-y-1">
+                  {contacts.map((c) => (
+                    <li key={c.contact_user_id}>
+                      <button
+                        onClick={() => startWith(c.contact_user_id)}
+                        disabled={!!busyContactId}
+                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-glass disabled:opacity-50"
+                      >
+                        <Avatar name={c.display_name} url={c.avatar_url} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{c.display_name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                        </div>
+                        {busyContactId === c.contact_user_id && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

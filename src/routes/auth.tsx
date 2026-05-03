@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Check, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { EurekupLogo } from "@/components/eurekup-logo";
@@ -12,9 +12,15 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const schema = z.object({
+const passwordRules = {
+  length: (p: string) => p.length >= 8,
+  upper: (p: string) => /[A-Z]/.test(p),
+  lower: (p: string) => /[a-z]/.test(p),
+  number: (p: string) => /[0-9]/.test(p),
+};
+
+const baseSchema = z.object({
   email: z.string().trim().email("Email inválido").max(255),
-  password: z.string().min(6, "Mínimo 6 caracteres").max(72),
   name: z.string().trim().min(1, "Requerido").max(60).optional(),
 });
 
@@ -31,11 +37,30 @@ function AuthPage() {
     if (!authLoading && user) navigate({ to: "/app/chats" });
   }, [user, authLoading, navigate]);
 
+  const checks = useMemo(
+    () => ({
+      length: passwordRules.length(password),
+      upper: passwordRules.upper(password),
+      lower: passwordRules.lower(password),
+      number: passwordRules.number(password),
+    }),
+    [password]
+  );
+  const allPass = checks.length && checks.upper && checks.lower && checks.number;
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse({ email, password, name: mode === "signup" ? name : undefined });
+    const parsed = baseSchema.safeParse({ email, name: mode === "signup" ? name : undefined });
     if (!parsed.success) {
       toast.error(parsed.error.errors[0].message);
+      return;
+    }
+    if (mode === "signup" && !allPass) {
+      toast.error("La contraseña no cumple los requisitos");
+      return;
+    }
+    if (mode === "signin" && password.length < 6) {
+      toast.error("Contraseña inválida");
       return;
     }
     setLoading(true);
@@ -78,7 +103,7 @@ function AuthPage() {
       </div>
       <div className="glass-strong w-full max-w-md rounded-[2rem] p-8 animate-slide-up">
         <div className="mb-8 text-center">
-          <EurekupLogo className="mx-auto h-10 w-auto" />
+          <EurekupLogo className="mx-auto h-10 w-10 object-contain" />
           <h1 className="mt-5 text-3xl font-semibold tracking-tight">
             {mode === "signin" ? "Bienvenido" : "Crea tu cuenta"}
           </h1>
@@ -91,12 +116,38 @@ function AuthPage() {
           {mode === "signup" && (
             <Field label="Nombre" value={name} onChange={setName} placeholder="Tu nombre" />
           )}
-          <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="tu@email.com" autoComplete="email" />
-          <Field label="Contraseña" type="password" value={password} onChange={setPassword} placeholder="Mínimo 6 caracteres" autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+          <Field
+            label="Email"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            placeholder="tu@email.com"
+            autoComplete="email"
+          />
+          <Field
+            label="Contraseña"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            placeholder={mode === "signup" ? "Mínimo 8 caracteres" : "Tu contraseña"}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+          />
+
+          {mode === "signup" && (
+            <div className="glass-subtle space-y-1.5 rounded-2xl px-4 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Tu contraseña debe contener
+              </p>
+              <PassRule ok={checks.length} text="Al menos 8 caracteres" />
+              <PassRule ok={checks.upper} text="Una letra mayúscula (A–Z)" />
+              <PassRule ok={checks.lower} text="Una letra minúscula (a–z)" />
+              <PassRule ok={checks.number} text="Un número (0–9)" />
+            </div>
+          )}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (mode === "signup" && !allPass)}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-sm font-semibold text-primary-foreground shadow-soft transition hover:opacity-95 disabled:opacity-50"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -114,6 +165,21 @@ function AuthPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PassRule({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {ok ? (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-success/20 text-success">
+          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        </span>
+      ) : (
+        <Circle className="h-4 w-4 text-muted-foreground/50" />
+      )}
+      <span className={ok ? "text-foreground" : "text-muted-foreground"}>{text}</span>
     </div>
   );
 }
