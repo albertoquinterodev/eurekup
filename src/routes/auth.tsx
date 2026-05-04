@@ -31,7 +31,19 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Read ?ref=CODE from URL — pre-fill referral and switch to signup.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      setReferralCode(ref.toUpperCase().slice(0, 12));
+      setMode("signup");
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) navigate({ to: "/app/chats" });
