@@ -20,6 +20,8 @@ import {
   HardDrive,
   Layers,
   X,
+  Search,
+  FolderInput,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
