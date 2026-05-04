@@ -104,6 +104,35 @@ function Storage() {
     load();
   }, [load]);
 
+  // Realtime sync — files, folders, quota for current user.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`storage-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "files", filter: `owner_id=eq.${user.id}` },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "folders", filter: `owner_id=eq.${user.id}` },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "storage_quota", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const q = payload.new as { used_bytes: number; total_bytes: number };
+          setQuota({ used: Number(q.used_bytes), total: Number(q.total_bytes) });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, load]);
+
   // Build a map: parent_id -> folders[], parent_id (folder or null) -> files[]
   const childFolders = useMemo(() => {
     const map = new Map<string | null, FolderRow[]>();
