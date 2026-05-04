@@ -53,6 +53,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          rules: string | null
           tags: string[]
           visibility: Database["public"]["Enums"]["channel_visibility"]
         }
@@ -62,6 +63,7 @@ export type Database = {
           id?: string
           name: string
           owner_id: string
+          rules?: string | null
           tags?: string[]
           visibility?: Database["public"]["Enums"]["channel_visibility"]
         }
@@ -71,6 +73,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          rules?: string | null
           tags?: string[]
           visibility?: Database["public"]["Enums"]["channel_visibility"]
         }
@@ -109,16 +112,19 @@ export type Database = {
         Row: {
           conversation_id: string
           joined_at: string
+          last_read_at: string
           user_id: string
         }
         Insert: {
           conversation_id: string
           joined_at?: string
+          last_read_at?: string
           user_id: string
         }
         Update: {
           conversation_id?: string
           joined_at?: string
+          last_read_at?: string
           user_id?: string
         }
         Relationships: [
@@ -236,6 +242,33 @@ export type Database = {
           },
         ]
       }
+      friend_requests: {
+        Row: {
+          created_at: string
+          from_user: string
+          id: string
+          responded_at: string | null
+          status: Database["public"]["Enums"]["friend_request_status"]
+          to_user: string
+        }
+        Insert: {
+          created_at?: string
+          from_user: string
+          id?: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["friend_request_status"]
+          to_user: string
+        }
+        Update: {
+          created_at?: string
+          from_user?: string
+          id?: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["friend_request_status"]
+          to_user?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string | null
@@ -279,6 +312,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          link: string | null
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          link?: string | null
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -389,6 +455,7 @@ export type Database = {
     Enums: {
       channel_visibility: "public" | "private"
       conversation_kind: "direct" | "channel"
+      friend_request_status: "pending" | "accepted" | "declined"
       join_request_status: "pending" | "approved" | "rejected"
       message_status: "sent" | "delivered" | "read"
       referral_status: "pending" | "verified"
@@ -521,6 +588,7 @@ export const Constants = {
     Enums: {
       channel_visibility: ["public", "private"],
       conversation_kind: ["direct", "channel"],
+      friend_request_status: ["pending", "accepted", "declined"],
       join_request_status: ["pending", "approved", "rejected"],
       message_status: ["sent", "delivered", "read"],
       referral_status: ["pending", "verified"],
