@@ -155,6 +155,29 @@ function Storage() {
     return map;
   }, [files]);
 
+  // Search results — flat lists when query is active.
+  const q = query.trim().toLowerCase();
+  const searchActive = q.length > 0;
+  const matchingFiles = useMemo(
+    () => (searchActive ? files.filter((f) => f.name.toLowerCase().includes(q)) : []),
+    [files, q, searchActive]
+  );
+  const matchingFolders = useMemo(
+    () => (searchActive ? folders.filter((f) => f.name.toLowerCase().includes(q)) : []),
+    [folders, q, searchActive]
+  );
+
+  const folderPath = (id: string | null): string => {
+    if (!id) return "Inicio";
+    const parts: string[] = [];
+    let cur: FolderRow | undefined = folders.find((f) => f.id === id);
+    while (cur) {
+      parts.unshift(cur.name);
+      cur = cur.parent_id ? folders.find((f) => f.id === cur!.parent_id) : undefined;
+    }
+    return parts.join(" / ") || "Inicio";
+  };
+
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
