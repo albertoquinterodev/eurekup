@@ -160,6 +160,21 @@ function AuthPage() {
             </div>
           )}
 
+          {mode === "signup" && (
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                Código de referido <span className="opacity-60">(opcional, +1 GB para tu amigo)</span>
+              </span>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase().slice(0, 12))}
+                placeholder="EUREKUP1"
+                className="w-full rounded-2xl glass-subtle px-4 py-3 text-sm font-mono tracking-wider placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </label>
+          )}
+
           <button
             type="submit"
             disabled={loading || (mode === "signup" && !allPass)}
