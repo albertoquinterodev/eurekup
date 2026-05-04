@@ -141,40 +141,16 @@ function ChatsList() {
     if (!user) return;
     setBusyContactId(peerId);
     try {
-      // Find existing direct conversation with this peer.
-      const { data: mine } = await supabase
-        .from("conversation_members")
-        .select("conversation_id, conversations!inner(kind)")
-        .eq("user_id", user.id);
-      const myConvIds = (mine ?? [])
-        .filter((m) => (m.conversations as { kind: string }).kind === "direct")
-        .map((m) => m.conversation_id);
-      let existing: string | null = null;
-      if (myConvIds.length) {
-        const { data: peerMembers } = await supabase
-          .from("conversation_members")
-          .select("conversation_id")
-          .eq("user_id", peerId)
-          .in("conversation_id", myConvIds);
-        existing = peerMembers?.[0]?.conversation_id ?? null;
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.");
+        navigate({ to: "/auth" });
+        return;
       }
-      let convId = existing;
-      if (!convId) {
-        const { data: conv, error } = await supabase
-          .from("conversations")
-          .insert({ kind: "direct" })
-          .select("id")
-          .single();
-        if (error) throw error;
-        convId = conv.id;
-        const { error: mErr } = await supabase.from("conversation_members").insert([
-          { conversation_id: convId, user_id: user.id },
-          { conversation_id: convId, user_id: peerId },
-        ]);
-        if (mErr) throw mErr;
-      }
+      const { data: convId, error } = await supabase.rpc("get_or_create_direct_conversation", { _peer: peerId });
+      if (error || !convId) throw new Error(error?.message ?? "Error al crear chat");
       setPicker(false);
-      navigate({ to: "/app/chats/$id", params: { id: convId! } });
+      navigate({ to: "/app/chats/$id", params: { id: convId as string } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al crear chat");
     } finally {
