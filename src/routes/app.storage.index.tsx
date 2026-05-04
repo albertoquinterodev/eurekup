@@ -78,6 +78,9 @@ function Storage() {
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
   const [draggingFileId, setDraggingFileId] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ used: number; total: number }>({ used: 0, total: 5368709120 });
+  const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<FileRow | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
