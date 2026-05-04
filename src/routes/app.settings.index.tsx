@@ -98,6 +98,28 @@ function Settings() {
     toast.success("Código copiado");
   };
 
+  const copyInviteLink = () => {
+    if (!profile) return;
+    const link = `${window.location.origin}/auth?ref=${profile.referral_code}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Enlace de invitación copiado");
+  };
+
+  const shareInvite = async () => {
+    if (!profile) return;
+    const link = `${window.location.origin}/auth?ref=${profile.referral_code}`;
+    const text = `Únete a Eurekup conmigo y conseguimos +1 GB extra. Usa mi enlace: ${link}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Eurekup", text, url: link });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      copyInviteLink();
+    }
+  };
+
   const logout = async () => {
     await signOut();
     navigate({ to: "/" });
