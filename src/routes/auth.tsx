@@ -87,11 +87,14 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { display_name: name },
+            data: {
+              display_name: name,
+              ...(referralCode.trim() ? { referral_code: referralCode.trim().toUpperCase() } : {}),
+            },
           },
         });
         if (error) throw error;
-        toast.success("Cuenta creada");
+        toast.success(referralCode ? "Cuenta creada con código de referido" : "Cuenta creada");
       }
       navigate({ to: "/app/chats" });
     } catch (err: unknown) {
