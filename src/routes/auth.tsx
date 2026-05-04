@@ -31,7 +31,19 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Read ?ref=CODE from URL — pre-fill referral and switch to signup.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      setReferralCode(ref.toUpperCase().slice(0, 12));
+      setMode("signup");
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) navigate({ to: "/app/chats" });
@@ -75,11 +87,14 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { display_name: name },
+            data: {
+              display_name: name,
+              ...(referralCode.trim() ? { referral_code: referralCode.trim().toUpperCase() } : {}),
+            },
           },
         });
         if (error) throw error;
-        toast.success("Cuenta creada");
+        toast.success(referralCode ? "Cuenta creada con código de referido" : "Cuenta creada");
       }
       navigate({ to: "/app/chats" });
     } catch (err: unknown) {
@@ -143,6 +158,21 @@ function AuthPage() {
               <PassRule ok={checks.lower} text="Una letra minúscula (a–z)" />
               <PassRule ok={checks.number} text="Un número (0–9)" />
             </div>
+          )}
+
+          {mode === "signup" && (
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                Código de referido <span className="opacity-60">(opcional, +1 GB para tu amigo)</span>
+              </span>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase().slice(0, 12))}
+                placeholder="EUREKUP1"
+                className="w-full rounded-2xl glass-subtle px-4 py-3 text-sm font-mono tracking-wider placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </label>
           )}
 
           <button

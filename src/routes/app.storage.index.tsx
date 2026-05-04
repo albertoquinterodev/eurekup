@@ -20,6 +20,8 @@ import {
   HardDrive,
   Layers,
   X,
+  Search,
+  FolderInput,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -76,6 +78,9 @@ function Storage() {
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
   const [draggingFileId, setDraggingFileId] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ used: number; total: number }>({ used: 0, total: 5368709120 });
+  const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<FileRow | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -99,6 +104,35 @@ function Storage() {
     load();
   }, [load]);
 
+  // Realtime sync — files, folders, quota for current user.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`storage-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "files", filter: `owner_id=eq.${user.id}` },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "folders", filter: `owner_id=eq.${user.id}` },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "storage_quota", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const q = payload.new as { used_bytes: number; total_bytes: number };
+          setQuota({ used: Number(q.used_bytes), total: Number(q.total_bytes) });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, load]);
+
   // Build a map: parent_id -> folders[], parent_id (folder or null) -> files[]
   const childFolders = useMemo(() => {
     const map = new Map<string | null, FolderRow[]>();
@@ -120,6 +154,29 @@ function Storage() {
     }
     return map;
   }, [files]);
+
+  // Search results — flat lists when query is active.
+  const q = query.trim().toLowerCase();
+  const searchActive = q.length > 0;
+  const matchingFiles = useMemo(
+    () => (searchActive ? files.filter((f) => f.name.toLowerCase().includes(q)) : []),
+    [files, q, searchActive]
+  );
+  const matchingFolders = useMemo(
+    () => (searchActive ? folders.filter((f) => f.name.toLowerCase().includes(q)) : []),
+    [folders, q, searchActive]
+  );
+
+  const folderPath = (id: string | null): string => {
+    if (!id) return "Inicio";
+    const parts: string[] = [];
+    let cur: FolderRow | undefined = folders.find((f) => f.id === id);
+    while (cur) {
+      parts.unshift(cur.name);
+      cur = cur.parent_id ? folders.find((f) => f.id === cur!.parent_id) : undefined;
+    }
+    return parts.join(" / ") || "Inicio";
+  };
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
