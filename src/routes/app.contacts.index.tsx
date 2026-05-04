@@ -57,45 +57,22 @@ function Contacts() {
   }, [user]);
 
   // Find or create a direct conversation between current user and a peer.
+  // Uses a security-definer RPC so it is atomic and survives expired-session edge cases
+  // (the call refreshes the session client-side first).
   const ensureDirectConv = async (peerId: string): Promise<string | null> => {
     if (!user) return null;
-    const { data: mine } = await supabase
-      .from("conversation_members")
-      .select("conversation_id, conversations!inner(kind)")
-      .eq("user_id", user.id);
-    const ids = (mine ?? [])
-      .filter((m) => (m.conversations as { kind: string }).kind === "direct")
-      .map((m) => m.conversation_id);
-    let convId: string | null = null;
-    if (ids.length) {
-      const { data: peers } = await supabase
-        .from("conversation_members")
-        .select("conversation_id")
-        .eq("user_id", peerId)
-        .in("conversation_id", ids);
-      convId = peers?.[0]?.conversation_id ?? null;
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.");
+      navigate({ to: "/auth" });
+      return null;
     }
-    if (!convId) {
-      const { data: conv, error } = await supabase
-        .from("conversations")
-        .insert({ kind: "direct" })
-        .select("id")
-        .single();
-      if (error) {
-        toast.error(error.message);
-        return null;
-      }
-      convId = conv.id;
-      const { error: mErr } = await supabase.from("conversation_members").insert([
-        { conversation_id: convId, user_id: user.id },
-        { conversation_id: convId, user_id: peerId },
-      ]);
-      if (mErr) {
-        toast.error(mErr.message);
-        return null;
-      }
+    const { data, error } = await supabase.rpc("get_or_create_direct_conversation", { _peer: peerId });
+    if (error) {
+      toast.error(error.message || "No se pudo abrir el chat");
+      return null;
     }
-    return convId;
+    return data as string;
   };
 
   const addContact = async () => {

@@ -443,6 +443,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_or_create_direct_conversation: {
+        Args: { _peer: string }
+        Returns: string
+      }
       is_channel_member: {
         Args: { _channel: string; _user: string }
         Returns: boolean
