@@ -203,6 +203,23 @@ function Settings() {
             </button>
           )}
 
+          {profile && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                onClick={shareInvite}
+                className="flex items-center justify-center gap-1.5 rounded-full bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground hover:opacity-95"
+              >
+                <Gift className="h-3.5 w-3.5" /> Compartir invitación
+              </button>
+              <button
+                onClick={copyInviteLink}
+                className="flex items-center justify-center gap-1.5 rounded-full glass-subtle px-3 py-2.5 text-xs font-medium hover:bg-glass"
+              >
+                <Copy className="h-3.5 w-3.5" /> Copiar enlace
+              </button>
+            </div>
+          )}
+
           <div className="mt-3 flex gap-2">
             <input
               type="email"
