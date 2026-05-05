@@ -206,25 +206,25 @@
 @layer utilities {
   .glass {
     background-color: var(--glass);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(70px) saturate(180%);
+    -webkit-backdrop-filter: blur(70px) saturate(180%);
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-glass);
   }
 
   .glass-strong {
     background-color: var(--glass-strong);
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    backdrop-filter: blur(70px) saturate(200%);
+    -webkit-backdrop-filter: blur(70px) saturate(200%);
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-elevated);
   }
 
   .glass-subtle {
-    background-color: oklch(1 0 0 / 0.03);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid oklch(1 0 0 / 0.06);
+    background-color: var(--glass);
+    backdrop-filter: blur(40px) saturate(160%);
+    -webkit-backdrop-filter: blur(40px) saturate(160%);
+    border: 1px solid var(--glass-border);
   }
 
   /* High-blur frosted surface (~70% opacity) — for FAB, bottom nav, app bar. */
