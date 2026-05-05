@@ -494,24 +494,32 @@ function Storage() {
         </button>
         <button
           onClick={() => openFile(file)}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground sm:hidden sm:group-hover:flex"
           aria-label="Descargar"
         >
           <Download className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setMoveTarget(file)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground"
+          aria-label="Mover a"
+          title="Mover a otra carpeta"
+        >
+          <FolderInput className="h-4 w-4" />
         </button>
         <button
           onClick={() => {
             setRenameTarget(file);
             setRenameValue(file.name);
           }}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground"
           aria-label="Renombrar"
         >
           <Pencil className="h-4 w-4" />
         </button>
         <button
           onClick={() => setConfirmDelFile(file)}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
           aria-label="Eliminar"
         >
           <Trash2 className="h-4 w-4" />
