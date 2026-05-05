@@ -33,6 +33,7 @@ function Settings() {
   const [inviting, setInviting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [showPremium, setShowPremium] = useState(false);
 
   useEffect(() => {
     if (!user) return;
