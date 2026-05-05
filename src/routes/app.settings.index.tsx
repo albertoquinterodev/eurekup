@@ -329,6 +329,69 @@ function Settings() {
         destructive
         onConfirm={deleteAccount}
       />
+
+      {showPremium && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/70 backdrop-blur-md" onClick={() => setShowPremium(false)} />
+          <div className="glass-strong relative flex max-h-[90dvh] w-full max-w-lg flex-col rounded-3xl p-6 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5" />
+                <h2 className="text-lg font-semibold">Eurekup Premium</h2>
+              </div>
+              <button onClick={() => setShowPremium(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+                <Trash2 className="hidden" />
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Más espacio para tus archivos y conversaciones.
+            </p>
+            <div className="mt-4 -mx-1 flex-1 space-y-2 overflow-y-auto px-1">
+              {[
+                { size: "100 GB", price: "1,99 €", period: "/mes", highlight: false },
+                { size: "200 GB", price: "2,99 €", period: "/mes", highlight: true, badge: "Popular" },
+                { size: "1 TB", price: "9,99 €", period: "/mes", highlight: false },
+                { size: "5 TB", price: "24,99 €", period: "/mes", highlight: false },
+              ].map((plan) => (
+                <button
+                  key={plan.size}
+                  onClick={() => toast.info("Pagos disponibles próximamente")}
+                  className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
+                    plan.highlight
+                      ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+                      : "border-glass-border glass-subtle hover:bg-glass"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-glass-strong">
+                      <Check className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{plan.size}</p>
+                        {plan.badge && (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
+                            {plan.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Almacenamiento total</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold">{plan.price}</p>
+                    <p className="text-xs text-muted-foreground">{plan.period}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-[11px] text-muted-foreground">
+              Cancela cuando quieras. Precios incluyen impuestos aplicables.
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
