@@ -50,6 +50,7 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
             </button>
           )}
           {rightSlot}
+          <NotificationsBell />
           {!hideMenu && (
             <div className="relative" ref={ref}>
               <button
