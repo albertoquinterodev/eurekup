@@ -494,24 +494,32 @@ function Storage() {
         </button>
         <button
           onClick={() => openFile(file)}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground sm:hidden sm:group-hover:flex"
           aria-label="Descargar"
         >
           <Download className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setMoveTarget(file)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground"
+          aria-label="Mover a"
+          title="Mover a otra carpeta"
+        >
+          <FolderInput className="h-4 w-4" />
         </button>
         <button
           onClick={() => {
             setRenameTarget(file);
             setRenameValue(file.name);
           }}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass-strong hover:text-foreground"
           aria-label="Renombrar"
         >
           <Pencil className="h-4 w-4" />
         </button>
         <button
           onClick={() => setConfirmDelFile(file)}
-          className="hidden h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 group-hover:flex"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
           aria-label="Eliminar"
         >
           <Trash2 className="h-4 w-4" />
@@ -797,6 +805,63 @@ function Storage() {
               <button onClick={createFolder} className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground">
                 Crear
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move file modal */}
+      {moveTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setMoveTarget(null)} />
+          <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Mover archivo</h2>
+              <button onClick={() => setMoveTarget(null)} className="rounded-full p-1.5 hover:bg-glass">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{moveTarget.name}</p>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              <ul className="space-y-1">
+                <li>
+                  <button
+                    onClick={async () => {
+                      await moveFileToFolder(moveTarget.id, null);
+                      setMoveTarget(null);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">Inicio</p>
+                      <p className="text-xs text-muted-foreground">Carpeta raíz</p>
+                    </div>
+                  </button>
+                </li>
+                {folders.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      onClick={async () => {
+                        await moveFileToFolder(moveTarget.id, f.id);
+                        setMoveTarget(null);
+                      }}
+                      disabled={moveTarget.folder_id === f.id}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass disabled:opacity-40"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                        <Folder className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{f.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{folderPath(f.id)}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
