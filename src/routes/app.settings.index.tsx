@@ -340,7 +340,6 @@ function Settings() {
                 <h2 className="text-lg font-semibold">Eurekup Premium</h2>
               </div>
               <button onClick={() => setShowPremium(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
-                <Trash2 className="hidden" />
                 <span aria-hidden>✕</span>
               </button>
             </div>
