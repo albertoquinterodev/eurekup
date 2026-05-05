@@ -117,7 +117,7 @@ export function NotificationsBell() {
                     markRead(n);
                     if (n.link) {
                       setOpen(false);
-                      navigate({ to: n.link });
+                      navigate({ to: n.link as string });
                     }
                   };
                   return (
