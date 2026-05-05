@@ -113,24 +113,17 @@ export function NotificationsBell() {
             ) : (
               <ul>
                 {items.map((n) => {
-                  const Wrapper = (props: { children: React.ReactNode }) =>
-                    n.link ? (
-                      <Link
-                        to={n.link}
-                        onClick={() => { markRead(n); setOpen(false); }}
-                        className="block"
-                      >
-                        {props.children}
-                      </Link>
-                    ) : (
-                      <button onClick={() => markRead(n)} className="block w-full text-left">
-                        {props.children}
-                      </button>
-                    );
+                  const handleClick = () => {
+                    markRead(n);
+                    if (n.link) {
+                      setOpen(false);
+                      navigate({ to: n.link });
+                    }
+                  };
                   return (
                     <li key={n.id} className="border-b border-glass-border last:border-0">
                       <div className="group relative">
-                        <Wrapper>
+                        <button onClick={handleClick} className="block w-full text-left">
                           <div className={`flex gap-3 px-4 py-3 transition hover:bg-glass ${!n.read_at ? "bg-primary/5" : ""}`}>
                             {!n.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                             <div className="min-w-0 flex-1">
@@ -139,7 +132,7 @@ export function NotificationsBell() {
                               <p className="mt-1 text-[10px] text-muted-foreground">{formatTime(n.created_at)}</p>
                             </div>
                           </div>
-                        </Wrapper>
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); remove(n.id); }}
                           className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex"
