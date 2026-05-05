@@ -1,7 +1,8 @@
-import { Search, MoreVertical, Plus, Bookmark, UserPen, Settings as SettingsIcon, Sun, Moon, Hash } from "lucide-react";
+import { Search, MoreVertical, Bookmark, UserPen, Settings as SettingsIcon, Sun, Moon, Hash } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { EurekupLogo } from "@/components/eurekup-logo";
+import { NotificationsBell } from "@/components/notifications-bell";
 import { useTheme } from "@/hooks/use-theme";
 
 interface AppBarProps {
