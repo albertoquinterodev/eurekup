@@ -174,7 +174,26 @@ function Settings() {
           </p>
         </div>
 
-        {/* Referrals */}
+        {/* Premium */}
+        <button
+          onClick={() => setShowPremium(true)}
+          className="glass relative w-full overflow-hidden rounded-3xl p-5 text-left transition hover:bg-glass-strong"
+        >
+          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+              <Crown className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">Eurekup Premium</p>
+              <p className="truncate text-xs text-muted-foreground">
+                Aumenta tu almacenamiento hasta 5 TB
+              </p>
+            </div>
+            <Sparkles className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </button>
+
         <div className="glass rounded-3xl p-5">
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5" />
