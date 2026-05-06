@@ -192,9 +192,18 @@ function Contacts() {
                   <button
                     onClick={() => startChat(c)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
-                    aria-label="Chatear"
+                    aria-label="Nuevo chat"
+                    title="Nuevo chat"
                   >
                     <MessageSquare className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => navigate({ to: "/app/channels" })}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
+                    aria-label="Nuevo canal"
+                    title="Crear o unirse a un canal"
+                  >
+                    <Hash className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDel(c)}
