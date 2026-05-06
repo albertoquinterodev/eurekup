@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { UserPlus, Trash2, MessageSquare, Loader2 } from "lucide-react";
+import { UserPlus, Trash2, MessageSquare, Loader2, Hash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
@@ -192,9 +192,18 @@ function Contacts() {
                   <button
                     onClick={() => startChat(c)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
-                    aria-label="Chatear"
+                    aria-label="Nuevo chat"
+                    title="Nuevo chat"
                   >
                     <MessageSquare className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => navigate({ to: "/app/channels" })}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
+                    aria-label="Nuevo canal"
+                    title="Crear o unirse a un canal"
+                  >
+                    <Hash className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDel(c)}
