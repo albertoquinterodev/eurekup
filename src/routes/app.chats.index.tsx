@@ -208,19 +208,51 @@ function ChatsList() {
     }
   };
 
+  const [search, setSearch] = useState("");
   const filtered = chats.filter((c) => {
-    if (filter === "personal") return !c.is_channel;
-    if (filter === "unread") return false;
+    if (filter === "personal" && c.is_channel) return false;
+    if (filter === "unread" && c.unread === 0) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      if (
+        !c.display_name.toLowerCase().includes(q) &&
+        !(c.last_body ?? "").toLowerCase().includes(q)
+      )
+        return false;
+    }
     return true;
   });
+  const totalUnread = chats.reduce((a, c) => a + c.unread, 0);
 
   return (
     <>
-      <AppBar title="Chats" subtitle={chats.length ? `${chats.length} conversaciones` : "Sin conversaciones"} />
+      <AppBar
+        title="Chats"
+        subtitle={
+          totalUnread > 0
+            ? `${totalUnread} sin leer · ${chats.length} conversaciones`
+            : chats.length
+            ? `${chats.length} conversaciones`
+            : "Sin conversaciones"
+        }
+      />
+      <div className="px-3 pt-3">
+        <div className="glass flex items-center gap-2 rounded-full px-4 py-2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar en conversaciones…"
+            className="flex-1 bg-transparent text-sm focus:outline-none"
+          />
+        </div>
+      </div>
       <ChipRow>
         <Chip active={filter === "all"} onClick={() => setFilter("all")}>Todos</Chip>
         <Chip active={filter === "personal"} onClick={() => setFilter("personal")}>Personal</Chip>
-        <Chip active={filter === "unread"} onClick={() => setFilter("unread")}>No leídos</Chip>
+        <Chip active={filter === "unread"} onClick={() => setFilter("unread")}>
+          No leídos {totalUnread > 0 && `(${totalUnread})`}
+        </Chip>
       </ChipRow>
 
       <div className="px-3 pb-4">
@@ -250,12 +282,19 @@ function ChatsList() {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate font-medium">{c.display_name}</p>
+                      <p className={`truncate ${c.unread > 0 ? "font-semibold" : "font-medium"}`}>{c.display_name}</p>
                       <span className="shrink-0 text-xs text-muted-foreground">{formatTime(c.last_at)}</span>
                     </div>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {c.last_body ?? "Aún no hay mensajes"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className={`flex-1 truncate text-sm ${c.unread > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                        {c.last_body ?? "Aún no hay mensajes"}
+                      </p>
+                      {c.unread > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                          {c.unread > 99 ? "99+" : c.unread}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
                 {i < filtered.length - 1 && <div className="ml-[68px] h-px bg-glass-border" />}
