@@ -137,6 +137,16 @@ function ChatRoom() {
     loadHeader();
     loadMessages();
 
+    // Mark conversation as read for this user.
+    const markRead = async () => {
+      await supabase
+        .from("conversation_members")
+        .update({ last_read_at: new Date().toISOString() })
+        .eq("conversation_id", id)
+        .eq("user_id", user.id);
+    };
+    markRead();
+
     const ch = supabase
       .channel(`chat-${id}`)
       .on(
