@@ -48,55 +48,104 @@ function ChatsList() {
     if (!user) return;
     let mounted = true;
     const load = async () => {
-      const { data: members } = await supabase
+      // 1. My memberships with last_read_at
+      const { data: myMembers } = await supabase
         .from("conversation_members")
-        .select("conversation_id, conversations(id, kind, channel_id, last_message_at, channels(name))")
+        .select("conversation_id, last_read_at")
         .eq("user_id", user.id);
-
-      if (!members) {
-        if (mounted) setLoading(false);
+      if (!myMembers || myMembers.length === 0) {
+        if (mounted) { setChats([]); setLoading(false); }
         return;
       }
+      const convIds = myMembers.map((m) => m.conversation_id);
+      const lastRead = new Map(myMembers.map((m) => [m.conversation_id, m.last_read_at]));
 
-      const items: ChatItem[] = [];
-      for (const m of members) {
-        const c = m.conversations as { id: string; kind: "direct" | "channel"; channel_id: string | null; last_message_at: string; channels: { name: string } | null } | null;
-        if (!c) continue;
+      // 2. Conversation rows
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("id, kind, channel_id, last_message_at")
+        .in("id", convIds);
 
-        let displayName = "Conversación";
-        let avatarUrl: string | null = null;
-        if (c.kind === "channel" && c.channels) {
-          displayName = `# ${c.channels.name}`;
-        } else if (c.kind === "direct") {
-          const { data: peers } = await supabase
-            .from("conversation_members")
-            .select("user_id, profiles(display_name, avatar_url)")
-            .eq("conversation_id", c.id)
-            .neq("user_id", user.id)
-            .limit(1);
-          const peer = peers?.[0] as { profiles: { display_name: string; avatar_url: string | null } | null } | undefined;
-          if (peer?.profiles) {
-            displayName = peer.profiles.display_name;
-            avatarUrl = peer.profiles.avatar_url;
+      // 3. Channels for channel-kind convs
+      const channelIds = (convs ?? []).map((c) => c.channel_id).filter((x): x is string => !!x);
+      const channelMap = new Map<string, string>();
+      if (channelIds.length) {
+        const { data: chans } = await supabase.from("channels").select("id, name").in("id", channelIds);
+        for (const c of chans ?? []) channelMap.set(c.id, c.name);
+      }
+
+      // 4. Peers for direct convs
+      const directIds = (convs ?? []).filter((c) => c.kind === "direct").map((c) => c.id);
+      const peerByConv = new Map<string, { id: string; display_name: string; avatar_url: string | null }>();
+      if (directIds.length) {
+        const { data: peers } = await supabase
+          .from("conversation_members")
+          .select("conversation_id, user_id")
+          .in("conversation_id", directIds)
+          .neq("user_id", user.id);
+        const peerIds = Array.from(new Set((peers ?? []).map((p) => p.user_id)));
+        const profileById = new Map<string, { display_name: string; avatar_url: string | null }>();
+        if (peerIds.length) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_url")
+            .in("id", peerIds);
+          for (const p of profs ?? []) profileById.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url });
+        }
+        for (const p of peers ?? []) {
+          const prof = profileById.get(p.user_id);
+          if (prof) peerByConv.set(p.conversation_id, { id: p.user_id, ...prof });
+        }
+      }
+
+      // 5. Last message + unread count per conversation (one query)
+      const { data: lastMsgs } = await supabase
+        .from("messages")
+        .select("conversation_id, body, created_at, sender_id, deleted_at")
+        .in("conversation_id", convIds)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      const lastByConv = new Map<string, { body: string | null; created_at: string }>();
+      const unreadByConv = new Map<string, number>();
+      for (const m of lastMsgs ?? []) {
+        if (!lastByConv.has(m.conversation_id)) {
+          lastByConv.set(m.conversation_id, {
+            body: m.deleted_at ? "Mensaje eliminado" : m.body,
+            created_at: m.created_at,
+          });
+        }
+        if (m.sender_id !== user.id) {
+          const lr = lastRead.get(m.conversation_id);
+          if (!lr || m.created_at > lr) {
+            unreadByConv.set(m.conversation_id, (unreadByConv.get(m.conversation_id) ?? 0) + 1);
           }
         }
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("body, created_at")
-          .eq("conversation_id", c.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
+      }
 
-        items.push({
+      const items: ChatItem[] = (convs ?? []).map((c) => {
+        const last = lastByConv.get(c.id);
+        let displayName = "Conversación";
+        let avatarUrl: string | null = null;
+        if (c.kind === "channel" && c.channel_id) {
+          displayName = `# ${channelMap.get(c.channel_id) ?? "canal"}`;
+        } else {
+          const peer = peerByConv.get(c.id);
+          if (peer) {
+            displayName = peer.display_name;
+            avatarUrl = peer.avatar_url;
+          }
+        }
+        return {
           conversation_id: c.id,
-          kind: c.kind,
+          kind: c.kind as "direct" | "channel",
           display_name: displayName,
           avatar_url: avatarUrl,
-          last_body: lastMsg?.[0]?.body ?? null,
-          last_at: lastMsg?.[0]?.created_at ?? c.last_message_at,
+          last_body: last?.body ?? null,
+          last_at: last?.created_at ?? c.last_message_at,
           is_channel: c.kind === "channel",
-        });
-      }
+          unread: unreadByConv.get(c.id) ?? 0,
+        };
+      });
       items.sort((a, b) => b.last_at.localeCompare(a.last_at));
       if (mounted) {
         setChats(items);
