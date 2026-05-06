@@ -451,6 +451,10 @@ export type Database = {
         Args: { _channel: string; _user: string }
         Returns: boolean
       }
+      is_channel_owner: {
+        Args: { _channel: string; _user: string }
+        Returns: boolean
+      }
       is_conversation_member: {
         Args: { _conv: string; _user: string }
         Returns: boolean
