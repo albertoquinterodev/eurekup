@@ -24,6 +24,7 @@ interface ChatItem {
   last_body: string | null;
   last_at: string;
   is_channel: boolean;
+  unread: number;
 }
 
 interface ContactPick {
