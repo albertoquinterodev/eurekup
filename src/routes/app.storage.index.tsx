@@ -938,6 +938,85 @@ function Storage() {
           </div>
         </div>
       )}
+
+      {/* Bulk selection bar */}
+      {selecting && selectedFiles.size > 0 && (
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 safe-bottom">
+          <div className="glass-strong flex items-center gap-2 rounded-full px-3 py-2 shadow-elevated backdrop-blur-2xl">
+            <span className="px-2 text-sm font-medium">{selectedFiles.size} seleccionados</span>
+            <button
+              onClick={() => setBulkMoveOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              <FolderInput className="h-3.5 w-3.5" /> Mover
+            </button>
+            <button
+              onClick={() => setConfirmBulkDelete(true)}
+              className="flex items-center gap-1.5 rounded-full bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Eliminar
+            </button>
+            <button onClick={clearSelection} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bulkMoveOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setBulkMoveOpen(false)} />
+          <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Mover {selectedFiles.size} archivos</h2>
+              <button onClick={() => setBulkMoveOpen(false)} className="rounded-full p-1.5 hover:bg-glass">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              <ul className="space-y-1">
+                <li>
+                  <button
+                    onClick={() => bulkMove(null)}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                    <p className="text-sm font-medium">Inicio</p>
+                  </button>
+                </li>
+                {folders.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      onClick={() => bulkMove(f.id)}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                        <Folder className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{f.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{folderPath(f.id)}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onOpenChange={(o) => !o && setConfirmBulkDelete(false)}
+        title={`Eliminar ${selectedFiles.size} archivos`}
+        description="Esta acción no se puede deshacer."
+        destructive
+        confirmLabel="Eliminar"
+        onConfirm={bulkDelete}
+      />
     </>
   );
 }
