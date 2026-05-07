@@ -336,6 +336,64 @@ function ChatRoom() {
     window.open(data.signedUrl, "_blank");
   };
 
+  const downloadFile = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    const { data, error } = await supabase.storage.from("files").createSignedUrl(file.storage_path, 60);
+    if (error || !data) {
+      toast.error("No se pudo descargar");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = data.signedUrl;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success("Descarga iniciada");
+  };
+
+  const saveToEurekup = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    if (!user) return;
+    if (file.storage_path.startsWith(`${user.id}/`)) {
+      // Already in user's storage — just clone the DB row pointer.
+      const { error } = await supabase.from("files").insert({
+        owner_id: user.id,
+        folder_id: null,
+        name: file.name,
+        storage_path: file.storage_path,
+        mime_type: file.mime_type,
+        size_bytes: file.size_bytes,
+      });
+      if (error) toast.error("No se pudo guardar");
+      else toast.success("Guardado en tus archivos");
+      return;
+    }
+    try {
+      const { data: src, error: dlErr } = await supabase.storage.from("files").download(file.storage_path);
+      if (dlErr || !src) throw dlErr ?? new Error("Sin contenido");
+      const path = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("files").upload(path, src, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.mime_type ?? "application/octet-stream",
+      });
+      if (upErr) throw upErr;
+      const { error: dbErr } = await supabase.from("files").insert({
+        owner_id: user.id,
+        folder_id: null,
+        name: file.name,
+        storage_path: path,
+        mime_type: file.mime_type,
+        size_bytes: file.size_bytes,
+      });
+      if (dbErr) throw dbErr;
+      toast.success("Guardado en Eurekup");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
