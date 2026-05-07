@@ -504,7 +504,7 @@ function ChatRoom() {
                     {/* Action menu */}
                     {openMenuFor === m.id && !isDeleted && (
                       <div
-                        className={`absolute z-20 mt-1 min-w-44 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
+                        className={`absolute z-20 mt-1 min-w-48 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
                           mine ? "right-0" : "left-0"
                         } top-full`}
                       >
@@ -522,6 +522,22 @@ function ChatRoom() {
                         >
                           <Share2 className="h-4 w-4" /> Compartir
                         </button>
+                        {m.file && (
+                          <>
+                            <button
+                              onClick={() => downloadFile(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FileIcon className="h-4 w-4" /> Guardar en dispositivo
+                            </button>
+                            <button
+                              onClick={() => saveToEurekup(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FileText className="h-4 w-4" /> Guardar en Eurekup
+                            </button>
+                          </>
+                        )}
                         {mine && (
                           <button
                             onClick={() => deleteMessage(m)}
