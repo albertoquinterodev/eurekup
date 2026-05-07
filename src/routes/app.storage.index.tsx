@@ -598,14 +598,22 @@ function Storage() {
         title="Archivos"
         subtitle={`${formatBytes(quota.used)} de ${formatBytes(quota.total)} · ${Math.round(usedPct)}%`}
         rightSlot={
-          <div
-            className="ml-1 hidden h-1.5 w-24 overflow-hidden rounded-full bg-glass sm:block"
-            aria-hidden
-          >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => (selecting ? clearSelection() : setSelecting(true))}
+              className="rounded-full glass-subtle px-3 py-1.5 text-xs font-medium hover:bg-glass"
+            >
+              {selecting ? "Cancelar" : "Seleccionar"}
+            </button>
             <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${usedPct}%` }}
-            />
+              className="ml-1 hidden h-1.5 w-24 overflow-hidden rounded-full bg-glass sm:block"
+              aria-hidden
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${usedPct}%` }}
+              />
+            </div>
           </div>
         }
       />
