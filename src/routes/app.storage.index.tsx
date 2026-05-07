@@ -81,7 +81,53 @@ function Storage() {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [moveTarget, setMoveTarget] = useState<FileRow | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleSelect = (id: string) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => {
+    setSelectedFiles(new Set());
+    setSelecting(false);
+  };
+  const bulkMove = async (folderId: string | null) => {
+    const ids = Array.from(selectedFiles);
+    if (!ids.length) return;
+    const { error } = await supabase.from("files").update({ folder_id: folderId }).in("id", ids);
+    if (error) {
+      toast.error("No se pudieron mover");
+      return;
+    }
+    setFiles((prev) => prev.map((f) => (selectedFiles.has(f.id) ? { ...f, folder_id: folderId } : f)));
+    toast.success(`${ids.length} movidos`);
+    setBulkMoveOpen(false);
+    clearSelection();
+  };
+  const bulkDelete = async () => {
+    const targets = files.filter((f) => selectedFiles.has(f.id));
+    if (!targets.length) return;
+    const paths = targets.map((f) => f.storage_path);
+    await supabase.storage.from("files").remove(paths);
+    const { error } = await supabase.from("files").delete().in("id", targets.map((t) => t.id));
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setFiles((prev) => prev.filter((f) => !selectedFiles.has(f.id)));
+    setQuota((q) => ({ ...q, used: Math.max(0, q.used - targets.reduce((a, t) => a + t.size_bytes, 0)) }));
+    toast.success(`${targets.length} eliminados`);
+    setConfirmBulkDelete(false);
+    clearSelection();
+  };
 
   const load = useCallback(async () => {
     if (!user) return;
