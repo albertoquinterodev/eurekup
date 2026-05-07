@@ -81,7 +81,53 @@ function Storage() {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [moveTarget, setMoveTarget] = useState<FileRow | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleSelect = (id: string) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => {
+    setSelectedFiles(new Set());
+    setSelecting(false);
+  };
+  const bulkMove = async (folderId: string | null) => {
+    const ids = Array.from(selectedFiles);
+    if (!ids.length) return;
+    const { error } = await supabase.from("files").update({ folder_id: folderId }).in("id", ids);
+    if (error) {
+      toast.error("No se pudieron mover");
+      return;
+    }
+    setFiles((prev) => prev.map((f) => (selectedFiles.has(f.id) ? { ...f, folder_id: folderId } : f)));
+    toast.success(`${ids.length} movidos`);
+    setBulkMoveOpen(false);
+    clearSelection();
+  };
+  const bulkDelete = async () => {
+    const targets = files.filter((f) => selectedFiles.has(f.id));
+    if (!targets.length) return;
+    const paths = targets.map((f) => f.storage_path);
+    await supabase.storage.from("files").remove(paths);
+    const { error } = await supabase.from("files").delete().in("id", targets.map((t) => t.id));
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setFiles((prev) => prev.filter((f) => !selectedFiles.has(f.id)));
+    setQuota((q) => ({ ...q, used: Math.max(0, q.used - targets.reduce((a, t) => a + t.size_bytes, 0)) }));
+    toast.success(`${targets.length} eliminados`);
+    setConfirmBulkDelete(false);
+    clearSelection();
+  };
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -468,9 +514,10 @@ function Storage() {
 
   const FileRowItem = ({ file, depth }: { file: FileRow; depth: number }) => {
     const Icon = iconFor(file.mime_type);
+    const checked = selectedFiles.has(file.id);
     return (
       <div
-        draggable
+        draggable={!selecting}
         onDragStart={(e) => {
           setDraggingFileId(file.id);
           e.dataTransfer.effectAllowed = "move";
@@ -478,10 +525,27 @@ function Storage() {
         onDragEnd={() => setDraggingFileId(null)}
         className={`group flex items-center gap-2 rounded-2xl px-2 py-2 transition hover:bg-glass ${
           draggingFileId === file.id ? "opacity-50" : ""
-        }`}
+        } ${checked ? "bg-primary/10" : ""}`}
         style={{ paddingLeft: `${depth * 14 + 36}px` }}
       >
-        <button onClick={() => openFile(file)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+        {selecting && (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => toggleSelect(file.id)}
+            className="h-4 w-4 accent-primary"
+            aria-label="Seleccionar"
+          />
+        )}
+        <button
+          onClick={() => (selecting ? toggleSelect(file.id) : openFile(file))}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setSelecting(true);
+            toggleSelect(file.id);
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-glass-strong">
             <Icon className="h-4 w-4" />
           </div>
@@ -534,14 +598,22 @@ function Storage() {
         title="Archivos"
         subtitle={`${formatBytes(quota.used)} de ${formatBytes(quota.total)} · ${Math.round(usedPct)}%`}
         rightSlot={
-          <div
-            className="ml-1 hidden h-1.5 w-24 overflow-hidden rounded-full bg-glass sm:block"
-            aria-hidden
-          >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => (selecting ? clearSelection() : setSelecting(true))}
+              className="rounded-full glass-subtle px-3 py-1.5 text-xs font-medium hover:bg-glass"
+            >
+              {selecting ? "Cancelar" : "Seleccionar"}
+            </button>
             <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${usedPct}%` }}
-            />
+              className="ml-1 hidden h-1.5 w-24 overflow-hidden rounded-full bg-glass sm:block"
+              aria-hidden
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${usedPct}%` }}
+              />
+            </div>
           </div>
         }
       />
@@ -866,6 +938,85 @@ function Storage() {
           </div>
         </div>
       )}
+
+      {/* Bulk selection bar */}
+      {selecting && selectedFiles.size > 0 && (
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 safe-bottom">
+          <div className="glass-strong flex items-center gap-2 rounded-full px-3 py-2 shadow-elevated backdrop-blur-2xl">
+            <span className="px-2 text-sm font-medium">{selectedFiles.size} seleccionados</span>
+            <button
+              onClick={() => setBulkMoveOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              <FolderInput className="h-3.5 w-3.5" /> Mover
+            </button>
+            <button
+              onClick={() => setConfirmBulkDelete(true)}
+              className="flex items-center gap-1.5 rounded-full bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Eliminar
+            </button>
+            <button onClick={clearSelection} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bulkMoveOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setBulkMoveOpen(false)} />
+          <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Mover {selectedFiles.size} archivos</h2>
+              <button onClick={() => setBulkMoveOpen(false)} className="rounded-full p-1.5 hover:bg-glass">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              <ul className="space-y-1">
+                <li>
+                  <button
+                    onClick={() => bulkMove(null)}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                    <p className="text-sm font-medium">Inicio</p>
+                  </button>
+                </li>
+                {folders.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      onClick={() => bulkMove(f.id)}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-glass"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-glass-strong">
+                        <Folder className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{f.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{folderPath(f.id)}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onOpenChange={(o) => !o && setConfirmBulkDelete(false)}
+        title={`Eliminar ${selectedFiles.size} archivos`}
+        description="Esta acción no se puede deshacer."
+        destructive
+        confirmLabel="Eliminar"
+        onConfirm={bulkDelete}
+      />
     </>
   );
 }

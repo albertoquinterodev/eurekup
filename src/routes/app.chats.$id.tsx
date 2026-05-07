@@ -336,6 +336,64 @@ function ChatRoom() {
     window.open(data.signedUrl, "_blank");
   };
 
+  const downloadFile = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    const { data, error } = await supabase.storage.from("files").createSignedUrl(file.storage_path, 60);
+    if (error || !data) {
+      toast.error("No se pudo descargar");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = data.signedUrl;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success("Descarga iniciada");
+  };
+
+  const saveToEurekup = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    if (!user) return;
+    if (file.storage_path.startsWith(`${user.id}/`)) {
+      // Already in user's storage — just clone the DB row pointer.
+      const { error } = await supabase.from("files").insert({
+        owner_id: user.id,
+        folder_id: null,
+        name: file.name,
+        storage_path: file.storage_path,
+        mime_type: file.mime_type,
+        size_bytes: file.size_bytes,
+      });
+      if (error) toast.error("No se pudo guardar");
+      else toast.success("Guardado en tus archivos");
+      return;
+    }
+    try {
+      const { data: src, error: dlErr } = await supabase.storage.from("files").download(file.storage_path);
+      if (dlErr || !src) throw dlErr ?? new Error("Sin contenido");
+      const path = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("files").upload(path, src, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.mime_type ?? "application/octet-stream",
+      });
+      if (upErr) throw upErr;
+      const { error: dbErr } = await supabase.from("files").insert({
+        owner_id: user.id,
+        folder_id: null,
+        name: file.name,
+        storage_path: path,
+        mime_type: file.mime_type,
+        size_bytes: file.size_bytes,
+      });
+      if (dbErr) throw dbErr;
+      toast.success("Guardado en Eurekup");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
@@ -436,7 +494,7 @@ function ChatRoom() {
                     {!isDeleted && (
                       <button
                         onClick={() => setOpenMenuFor(openMenuFor === m.id ? null : m.id)}
-                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} hidden h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass group-hover:flex`}
+                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} flex h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass`}
                         aria-label="Acciones"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
@@ -446,7 +504,7 @@ function ChatRoom() {
                     {/* Action menu */}
                     {openMenuFor === m.id && !isDeleted && (
                       <div
-                        className={`absolute z-20 mt-1 min-w-44 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
+                        className={`absolute z-20 mt-1 min-w-48 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
                           mine ? "right-0" : "left-0"
                         } top-full`}
                       >
@@ -464,6 +522,22 @@ function ChatRoom() {
                         >
                           <Share2 className="h-4 w-4" /> Compartir
                         </button>
+                        {m.file && (
+                          <>
+                            <button
+                              onClick={() => downloadFile(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FileIcon className="h-4 w-4" /> Guardar en dispositivo
+                            </button>
+                            <button
+                              onClick={() => saveToEurekup(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FileText className="h-4 w-4" /> Guardar en Eurekup
+                            </button>
+                          </>
+                        )}
                         {mine && (
                           <button
                             onClick={() => deleteMessage(m)}

@@ -170,8 +170,18 @@ function Settings() {
             <div className="h-full rounded-full bg-primary" style={{ width: `${usedPct}%` }} />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Invita amigos para ganar +1 GB por cada uno verificado.
+            Invita amigos para ganar +1 GB por cada uno verificado (hasta 15 GB extra · 20 GB en total).
           </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
+              <p className="text-lg font-semibold">+{Math.min(15, referrals.verified)} GB</p>
+              <p className="text-[11px] text-muted-foreground">Activos por verificados</p>
+            </div>
+            <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
+              <p className="text-lg font-semibold">{referrals.pending}</p>
+              <p className="text-[11px] text-muted-foreground">Pendientes de verificar</p>
+            </div>
+          </div>
         </div>
 
         {/* Premium */}
