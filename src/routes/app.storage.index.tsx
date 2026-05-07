@@ -514,9 +514,10 @@ function Storage() {
 
   const FileRowItem = ({ file, depth }: { file: FileRow; depth: number }) => {
     const Icon = iconFor(file.mime_type);
+    const checked = selectedFiles.has(file.id);
     return (
       <div
-        draggable
+        draggable={!selecting}
         onDragStart={(e) => {
           setDraggingFileId(file.id);
           e.dataTransfer.effectAllowed = "move";
@@ -524,10 +525,27 @@ function Storage() {
         onDragEnd={() => setDraggingFileId(null)}
         className={`group flex items-center gap-2 rounded-2xl px-2 py-2 transition hover:bg-glass ${
           draggingFileId === file.id ? "opacity-50" : ""
-        }`}
+        } ${checked ? "bg-primary/10" : ""}`}
         style={{ paddingLeft: `${depth * 14 + 36}px` }}
       >
-        <button onClick={() => openFile(file)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+        {selecting && (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => toggleSelect(file.id)}
+            className="h-4 w-4 accent-primary"
+            aria-label="Seleccionar"
+          />
+        )}
+        <button
+          onClick={() => (selecting ? toggleSelect(file.id) : openFile(file))}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setSelecting(true);
+            toggleSelect(file.id);
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-glass-strong">
             <Icon className="h-4 w-4" />
           </div>
