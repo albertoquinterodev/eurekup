@@ -102,9 +102,9 @@ function Landing() {
       <section id="features" className="mx-auto max-w-6xl px-5 pb-32">
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { icon: MessagesSquare, title: "Chats en tiempo real", text: "Mensajes instantáneos con doble check, canales y conversaciones 1-a-1." },
-            { icon: FolderClosed, title: "Drive integrado", text: "Sube, organiza y comparte archivos sin salir de la app." },
-            { icon: Lock, title: "Privado por diseño", text: "Cifrado en tránsito, control de acceso por canal y solicitudes de unión." },
+            { icon: MessagesSquare, title: "Chats en tiempo real", text: "Mensajes instantáneos con doble check, leídos en vivo, canales públicos y privados, y conversaciones 1-a-1." },
+            { icon: FolderClosed, title: "Drive integrado", text: "Sube, organiza con carpetas anidadas, mueve por arrastre y comparte archivos sin salir de la app." },
+            { icon: Lock, title: "Privado por diseño", text: "Cifrado en tránsito, RLS por usuario, moderación de canales y solicitudes de acceso." },
           ].map((f) => (
             <div key={f.title} className="glass rounded-3xl p-6">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-glass-strong">
@@ -116,11 +116,25 @@ function Landing() {
           ))}
         </div>
 
+        <div className="mt-10 grid gap-3 sm:grid-cols-2">
+          {[
+            { title: "Notificaciones en vivo", text: "Solicitudes, mensajes y aprobaciones de canal en tu campana." },
+            { title: "Búsqueda global", text: "Encuentra chats, contactos y archivos al instante." },
+            { title: "Premium hasta 5 TB", text: "Planes desde 1,99 €/mes con precios al estilo Drive." },
+            { title: "Modo claro y oscuro", text: "Diseño Liquid Glass coherente con animaciones de 0,2 s." },
+          ].map((f) => (
+            <div key={f.title} className="glass rounded-3xl p-5">
+              <h4 className="font-semibold">{f.title}</h4>
+              <p className="mt-1 text-sm text-muted-foreground">{f.text}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="glass-strong mt-10 flex flex-col items-center gap-5 rounded-[2rem] p-8 text-center sm:flex-row sm:justify-between sm:p-10 sm:text-left">
           <div>
             <h3 className="text-2xl font-semibold tracking-tight">Invita y crece tu espacio</h3>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Cada amigo verificado te suma <span className="text-foreground font-medium">+1 GB</span>.
+              Cada amigo verificado te suma <span className="text-foreground font-medium">+1 GB</span> · hasta <span className="text-foreground font-medium">20 GB</span> gratis.
             </p>
           </div>
           <Link
