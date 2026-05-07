@@ -494,7 +494,7 @@ function ChatRoom() {
                     {!isDeleted && (
                       <button
                         onClick={() => setOpenMenuFor(openMenuFor === m.id ? null : m.id)}
-                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} hidden h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass group-hover:flex`}
+                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} flex h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass`}
                         aria-label="Acciones"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
