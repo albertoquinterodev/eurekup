@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
 import { Avatar } from "@/components/avatar-bubble";
-import { Fab } from "@/components/fab";
+
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export const Route = createFileRoute("/app/contacts/")({
