@@ -411,7 +411,83 @@ function ChatRoom() {
     }
   };
 
-  return (
+  const copyMessage = async (m: Message) => {
+    setOpenMenuFor(null);
+    const t = m.body ?? m.file?.name ?? "";
+    try {
+      await navigator.clipboard.writeText(t);
+      toast.success("Copiado");
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  };
+
+  const forwardMessage = async (m: Message) => {
+    setOpenMenuFor(null);
+    const t = m.body ?? (m.file ? `Archivo: ${m.file.name}` : "");
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Eurekup", text: t });
+        return;
+      } catch {
+        // fallthrough
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(t);
+      toast.success("Mensaje copiado para reenviar");
+    } catch {
+      toast.error("No se pudo reenviar");
+    }
+  };
+
+  // Move file modal state
+  const [moveFile, setMoveFile] = useState<FileMeta | null>(null);
+  const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
+  const openMoveFor = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    if (!user) return;
+    const { data } = await supabase
+      .from("folders")
+      .select("id, name")
+      .eq("owner_id", user.id)
+      .order("name");
+    setFolders(data ?? []);
+    setMoveFile(file);
+  };
+  const doMove = async (folderId: string | null) => {
+    if (!moveFile || !user) return;
+    // Ensure user owns this file (if it was sent by peer, clone first).
+    let targetId = moveFile.id;
+    if (!moveFile.storage_path.startsWith(`${user.id}/`)) {
+      const { data: cloned, error } = await supabase
+        .from("files")
+        .insert({
+          owner_id: user.id,
+          folder_id: folderId,
+          name: moveFile.name,
+          storage_path: moveFile.storage_path,
+          mime_type: moveFile.mime_type,
+          size_bytes: moveFile.size_bytes,
+        })
+        .select("id")
+        .single();
+      if (error || !cloned) {
+        toast.error("No se pudo mover");
+        return;
+      }
+      targetId = cloned.id;
+    } else {
+      const { error } = await supabase.from("files").update({ folder_id: folderId }).eq("id", targetId);
+      if (error) {
+        toast.error("No se pudo mover");
+        return;
+      }
+    }
+    toast.success("Movido");
+    setMoveFile(null);
+  };
+
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
       <header className="shrink-0 safe-top">
