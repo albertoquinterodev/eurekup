@@ -528,7 +528,21 @@ function ChatRoom() {
                   key={m.id}
                   className={`group flex ${mine ? "justify-end" : "justify-start"} ${grouped ? "" : "mt-2"}`}
                 >
-                  <div className={`relative max-w-[78%] ${mine ? "" : ""}`}>
+                  <div
+                    className="relative max-w-[78%]"
+                    onTouchStart={(e) => {
+                      const t = window.setTimeout(() => setOpenMenuFor(m.id), 450);
+                      (e.currentTarget as HTMLDivElement & { _lp?: number })._lp = t;
+                    }}
+                    onTouchEnd={(e) => {
+                      const el = e.currentTarget as HTMLDivElement & { _lp?: number };
+                      if (el._lp) window.clearTimeout(el._lp);
+                    }}
+                    onTouchMove={(e) => {
+                      const el = e.currentTarget as HTMLDivElement & { _lp?: number };
+                      if (el._lp) window.clearTimeout(el._lp);
+                    }}
+                  >
                     <div
                       className={`rounded-2xl px-4 py-2.5 text-sm break-words ${
                         mine
