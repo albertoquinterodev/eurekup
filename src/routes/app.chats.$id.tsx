@@ -17,6 +17,10 @@ import {
   Film,
   File as FileIcon,
   MoreVertical,
+  Copy,
+  Forward,
+  FolderInput,
+  Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -90,26 +94,39 @@ function ChatRoom() {
     const loadHeader = async () => {
       const { data: conv } = await supabase
         .from("conversations")
-        .select("kind, channels(name, description)")
+        .select("kind, channel_id")
         .eq("id", id)
         .single();
       if (!conv) return;
-      if (conv.kind === "channel" && conv.channels) {
-        const ch = conv.channels as { name: string; description: string | null };
-        setTitle(`# ${ch.name}`);
-        setSubtitle(ch.description ?? "");
+      if (conv.kind === "channel" && conv.channel_id) {
+        const { data: ch } = await supabase
+          .from("channels")
+          .select("name, description")
+          .eq("id", conv.channel_id)
+          .single();
+        if (ch) {
+          setTitle(`# ${ch.name}`);
+          setSubtitle(ch.description ?? "");
+        }
       } else {
         const { data: peers } = await supabase
           .from("conversation_members")
-          .select("user_id, profiles(display_name, avatar_url)")
+          .select("user_id")
           .eq("conversation_id", id)
           .neq("user_id", user.id)
           .limit(1);
-        const p = peers?.[0] as { profiles: { display_name: string; avatar_url: string | null } | null } | undefined;
-        if (p?.profiles) {
-          setTitle(p.profiles.display_name);
-          setAvatar(p.profiles.avatar_url);
-          setSubtitle("En línea");
+        const peerId = peers?.[0]?.user_id;
+        if (peerId) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("display_name, avatar_url")
+            .eq("id", peerId)
+            .single();
+          if (prof) {
+            setTitle(prof.display_name);
+            setAvatar(prof.avatar_url);
+            setSubtitle("En línea");
+          }
         }
       }
     };
@@ -295,26 +312,6 @@ function ChatRoom() {
     );
   };
 
-  const shareMessage = async (m: Message) => {
-    setOpenMenuFor(null);
-    let textToShare = m.body ?? "";
-    if (m.file) textToShare = `${m.file.name}`;
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "Eurekup", text: textToShare, url });
-        return;
-      } catch {
-        // fallthrough to clipboard
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(`${textToShare}\n${url}`);
-      toast.success("Mensaje copiado");
-    } catch {
-      toast.error("No se pudo compartir");
-    }
-  };
 
   const startEdit = (m: Message) => {
     setOpenMenuFor(null);
@@ -394,6 +391,78 @@ function ChatRoom() {
     }
   };
 
+  const copyMessage = async (m: Message) => {
+    setOpenMenuFor(null);
+    const t = m.body ?? m.file?.name ?? "";
+    try {
+      await navigator.clipboard.writeText(t);
+      toast.success("Copiado");
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  };
+
+  const forwardMessage = async (m: Message) => {
+    setOpenMenuFor(null);
+    const t = m.body ?? (m.file ? `Archivo: ${m.file.name}` : "");
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Eurekup", text: t });
+        return;
+      } catch {
+        // fallthrough
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(t);
+      toast.success("Mensaje copiado para reenviar");
+    } catch {
+      toast.error("No se pudo reenviar");
+    }
+  };
+
+  // Move file modal state
+  const [moveFile, setMoveFile] = useState<FileMeta | null>(null);
+  const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
+  const openMoveFor = async (file: FileMeta) => {
+    setOpenMenuFor(null);
+    if (!user) return;
+    const { data } = await supabase
+      .from("folders")
+      .select("id, name")
+      .eq("owner_id", user.id)
+      .order("name");
+    setFolders(data ?? []);
+    setMoveFile(file);
+  };
+  const doMove = async (folderId: string | null) => {
+    if (!moveFile || !user) return;
+    if (!moveFile.storage_path.startsWith(`${user.id}/`)) {
+      const { error } = await supabase
+        .from("files")
+        .insert({
+          owner_id: user.id,
+          folder_id: folderId,
+          name: moveFile.name,
+          storage_path: moveFile.storage_path,
+          mime_type: moveFile.mime_type,
+          size_bytes: moveFile.size_bytes,
+        });
+      if (error) {
+        toast.error("No se pudo mover");
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("files").update({ folder_id: folderId }).eq("id", moveFile.id);
+      if (error) {
+        toast.error("No se pudo mover");
+        return;
+      }
+    }
+    toast.success("Movido");
+    setMoveFile(null);
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
@@ -439,7 +508,21 @@ function ChatRoom() {
                   key={m.id}
                   className={`group flex ${mine ? "justify-end" : "justify-start"} ${grouped ? "" : "mt-2"}`}
                 >
-                  <div className={`relative max-w-[78%] ${mine ? "" : ""}`}>
+                  <div
+                    className="relative max-w-[78%]"
+                    onTouchStart={(e) => {
+                      const t = window.setTimeout(() => setOpenMenuFor(m.id), 450);
+                      (e.currentTarget as HTMLDivElement & { _lp?: number })._lp = t;
+                    }}
+                    onTouchEnd={(e) => {
+                      const el = e.currentTarget as HTMLDivElement & { _lp?: number };
+                      if (el._lp) window.clearTimeout(el._lp);
+                    }}
+                    onTouchMove={(e) => {
+                      const el = e.currentTarget as HTMLDivElement & { _lp?: number };
+                      if (el._lp) window.clearTimeout(el._lp);
+                    }}
+                  >
                     <div
                       className={`rounded-2xl px-4 py-2.5 text-sm break-words ${
                         mine
@@ -490,11 +573,11 @@ function ChatRoom() {
                       </div>
                     </div>
 
-                    {/* Action button — visible on hover (desktop) and always on touch via menu toggle */}
+                    {/* Action button — only visible on hover (desktop). Mobile uses long-press on the bubble. */}
                     {!isDeleted && (
                       <button
                         onClick={() => setOpenMenuFor(openMenuFor === m.id ? null : m.id)}
-                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} flex h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass`}
+                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} hidden h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft transition-opacity duration-200 hover:bg-glass md:flex md:opacity-0 md:group-hover:opacity-100 ${openMenuFor === m.id ? "md:opacity-100" : ""}`}
                         aria-label="Acciones"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
@@ -504,10 +587,24 @@ function ChatRoom() {
                     {/* Action menu */}
                     {openMenuFor === m.id && !isDeleted && (
                       <div
-                        className={`absolute z-20 mt-1 min-w-48 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
+                        className={`absolute z-20 mt-1 min-w-52 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
                           mine ? "right-0" : "left-0"
                         } top-full`}
                       >
+                        {!m.file && (
+                          <button
+                            onClick={() => copyMessage(m)}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                          >
+                            <Copy className="h-4 w-4" /> Copiar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => forwardMessage(m)}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                        >
+                          <Forward className="h-4 w-4" /> Reenviar
+                        </button>
                         {mine && m.body !== null && !m.file && (
                           <button
                             onClick={() => startEdit(m)}
@@ -516,25 +613,25 @@ function ChatRoom() {
                             <Pencil className="h-4 w-4" /> Editar
                           </button>
                         )}
-                        <button
-                          onClick={() => shareMessage(m)}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
-                        >
-                          <Share2 className="h-4 w-4" /> Compartir
-                        </button>
                         {m.file && (
                           <>
                             <button
                               onClick={() => downloadFile(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <FileIcon className="h-4 w-4" /> Guardar en dispositivo
+                              <Download className="h-4 w-4" /> Descargar
+                            </button>
+                            <button
+                              onClick={() => openMoveFor(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FolderInput className="h-4 w-4" /> Mover a carpeta
                             </button>
                             <button
                               onClick={() => saveToEurekup(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <FileText className="h-4 w-4" /> Guardar en Eurekup
+                              <Share2 className="h-4 w-4" /> Guardar en Eurekup
                             </button>
                           </>
                         )}
@@ -609,6 +706,44 @@ function ChatRoom() {
           </button>
         </div>
       </div>
+
+      {/* Move-to-folder modal */}
+      {moveFile && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-md" onClick={() => setMoveFile(null)} />
+          <div className="glass-strong relative flex max-h-[70dvh] w-full max-w-sm flex-col rounded-3xl p-5 animate-slide-up backdrop-blur-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Mover a carpeta</h2>
+              <button onClick={() => setMoveFile(null)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{moveFile.name}</p>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              <button
+                onClick={() => doMove(null)}
+                className="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm hover:bg-glass"
+              >
+                <FolderInput className="h-4 w-4 text-muted-foreground" /> Raíz (sin carpeta)
+              </button>
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => doMove(f.id)}
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm hover:bg-glass"
+                >
+                  <FolderInput className="h-4 w-4 text-muted-foreground" /> {f.name}
+                </button>
+              ))}
+              {folders.length === 0 && (
+                <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  No tienes carpetas. Se guardará en la raíz.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

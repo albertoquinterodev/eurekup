@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles } from "lucide-react";
+import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles, ChevronDown, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -34,6 +34,16 @@ function Settings() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
+  const [showInviteEmail, setShowInviteEmail] = useState(false);
+  const [lang, setLang] = useState<string>(() => {
+    if (typeof window === "undefined") return "es";
+    return localStorage.getItem("eurekup_lang") ?? "es";
+  });
+  const setLanguage = (code: string) => {
+    setLang(code);
+    if (typeof window !== "undefined") localStorage.setItem("eurekup_lang", code);
+    toast.success("Idioma actualizado");
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -157,73 +167,55 @@ function Settings() {
           )}
         </div>
 
-        {/* Storage */}
-        <div className="glass rounded-3xl p-5">
-          <div className="flex items-baseline justify-between">
-            <p className="text-sm font-medium">Almacenamiento</p>
-            <p className="text-sm">
-              <span className="font-semibold">{formatBytes(quota.used)}</span>{" "}
-              <span className="text-muted-foreground">/ {formatBytes(quota.total)}</span>
+        {/* Storage + Premium unified */}
+        <div className="glass relative overflow-hidden rounded-3xl p-5">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+          <div className="relative">
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-medium">Almacenamiento</p>
+              <p className="text-sm">
+                <span className="font-semibold">{formatBytes(quota.used)}</span>{" "}
+                <span className="text-muted-foreground">/ {formatBytes(quota.total)}</span>
+              </p>
+            </div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-glass">
+              <div className="h-full rounded-full bg-primary transition-all duration-200" style={{ width: `${usedPct}%` }} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
+                <p className="text-lg font-semibold">+{Math.min(15, referrals.verified)} GB</p>
+                <p className="text-[11px] text-muted-foreground">Por verificados</p>
+              </div>
+              <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
+                <p className="text-lg font-semibold">{referrals.pending}</p>
+                <p className="text-[11px] text-muted-foreground">Pendientes</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPremium(true)}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
+            >
+              <Crown className="h-4 w-4" /> Pasar a Premium
+              <Sparkles className="h-3.5 w-3.5 opacity-80" />
+            </button>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Hasta 5 TB · O invita amigos para ganar +1 GB cada uno (máx. 15 GB).
             </p>
-          </div>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-glass">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${usedPct}%` }} />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Invita amigos para ganar +1 GB por cada uno verificado (hasta 15 GB extra · 20 GB en total).
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
-              <p className="text-lg font-semibold">+{Math.min(15, referrals.verified)} GB</p>
-              <p className="text-[11px] text-muted-foreground">Activos por verificados</p>
-            </div>
-            <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
-              <p className="text-lg font-semibold">{referrals.pending}</p>
-              <p className="text-[11px] text-muted-foreground">Pendientes de verificar</p>
-            </div>
           </div>
         </div>
 
-        {/* Premium */}
-        <button
-          onClick={() => setShowPremium(true)}
-          className="glass relative w-full overflow-hidden rounded-3xl p-5 text-left transition hover:bg-glass-strong"
-        >
-          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-          <div className="relative flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <Crown className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">Eurekup Premium</p>
-              <p className="truncate text-xs text-muted-foreground">
-                Aumenta tu almacenamiento hasta 5 TB
-              </p>
-            </div>
-            <Sparkles className="h-4 w-4 text-muted-foreground" />
-          </div>
-        </button>
-
+        {/* Referidos — simplificado */}
         <div className="glass rounded-3xl p-5">
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5" />
-            <p className="font-medium">Referidos</p>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="glass-subtle rounded-2xl p-3 text-center">
-              <p className="text-2xl font-semibold">{referrals.verified}</p>
-              <p className="text-xs text-muted-foreground">Verificados</p>
-            </div>
-            <div className="glass-subtle rounded-2xl p-3 text-center">
-              <p className="text-2xl font-semibold">{referrals.pending}</p>
-              <p className="text-xs text-muted-foreground">Pendientes</p>
-            </div>
+            <p className="font-medium">Invita y gana espacio</p>
           </div>
 
           {profile && (
             <button
               onClick={copyCode}
               className="mt-3 flex w-full items-center justify-between rounded-2xl glass-subtle px-4 py-3 text-sm transition hover:bg-glass"
+              title="Copiar código"
             >
               <span className="flex items-center gap-2">
                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -234,74 +226,124 @@ function Settings() {
           )}
 
           {profile && (
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              onClick={shareInvite}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-95"
+            >
+              <Gift className="h-4 w-4" /> Compartir invitación
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowInviteEmail((v) => !v)}
+            className="mt-2 flex w-full items-center justify-center gap-1 rounded-full px-3 py-2 text-xs text-muted-foreground hover:bg-glass"
+            aria-expanded={showInviteEmail}
+          >
+            <Mail className="h-3.5 w-3.5" /> Invitar por email
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showInviteEmail ? "rotate-180" : ""}`} />
+          </button>
+
+          {showInviteEmail && (
+            <div className="mt-2 flex gap-2 animate-slide-up">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="email@amigo.com"
+                className="flex-1 rounded-full glass-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
               <button
-                onClick={shareInvite}
-                className="flex items-center justify-center gap-1.5 rounded-full bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground hover:opacity-95"
+                onClick={invite}
+                disabled={inviting}
+                className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
-                <Gift className="h-3.5 w-3.5" /> Compartir invitación
-              </button>
-              <button
-                onClick={copyInviteLink}
-                className="flex items-center justify-center gap-1.5 rounded-full glass-subtle px-3 py-2.5 text-xs font-medium hover:bg-glass"
-              >
-                <Copy className="h-3.5 w-3.5" /> Copiar enlace
+                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Enviar
               </button>
             </div>
           )}
-
-          <div className="mt-3 flex gap-2">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="email@amigo.com"
-              className="flex-1 rounded-full glass-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <button
-              onClick={invite}
-              disabled={inviting}
-              className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Invitar
-            </button>
-          </div>
         </div>
 
-        {/* Actions */}
+        {/* Preferencias */}
         <div className="glass rounded-3xl overflow-hidden">
-          <button
-            onClick={toggleTheme}
-            className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
-          >
+          {/* Tema con switch */}
+          <div className="flex w-full items-center gap-3 px-5 py-4">
             {theme === "dark" ? (
-              <Sun className="h-5 w-5 text-muted-foreground" />
-            ) : (
               <Moon className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <Sun className="h-5 w-5 text-muted-foreground" />
             )}
-            <span className="flex-1">Modo {theme === "dark" ? "claro" : "oscuro"}</span>
-            <span className="text-xs text-muted-foreground">{theme === "dark" ? "Oscuro" : "Claro"}</span>
-          </button>
+            <span className="flex-1 text-sm">Tema</span>
+            <button
+              onClick={toggleTheme}
+              role="switch"
+              aria-checked={theme === "dark"}
+              aria-label="Alternar tema"
+              className={`relative h-7 w-12 rounded-full transition-colors duration-200 ${theme === "dark" ? "bg-primary" : "bg-glass-strong"}`}
+            >
+              <span
+                className={`absolute top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow-soft transition-all duration-200 ${
+                  theme === "dark" ? "left-[22px]" : "left-0.5"
+                }`}
+              >
+                {theme === "dark" ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
+              </span>
+            </button>
+          </div>
           <div className="ml-12 h-px bg-glass-border" />
+
+          {/* Idioma */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <span className="flex-1 text-sm">Idioma</span>
+              <span className="text-xs text-muted-foreground">i18n</span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { code: "es", label: "Español", ready: true },
+                { code: "en", label: "English", ready: true },
+                { code: "de", label: "Deutsch", ready: false },
+                { code: "fr", label: "Français", ready: false },
+                { code: "ru", label: "Русский", ready: false },
+                { code: "zh", label: "中文", ready: false },
+              ].map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => (l.ready ? setLanguage(l.code) : toast.info("Disponible próximamente"))}
+                  className={`rounded-2xl px-3 py-2 text-xs transition ${
+                    lang === l.code
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : l.ready
+                      ? "glass-subtle hover:bg-glass"
+                      : "glass-subtle opacity-50"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="ml-12 h-px bg-glass-border" />
+
           <button
             onClick={() => navigate({ to: "/app/channels" })}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <Hash className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1">Explorar canales</span>
+            <span className="flex-1 text-sm">Explorar canales</span>
           </button>
           <div className="ml-12 h-px bg-glass-border" />
           <a
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              toast.info("Política de privacidad disponible próximamente");
+              toast.info("Política de privacidad disponible próximamente.");
             }}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <Shield className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1">Política de privacidad</span>
+            <span className="flex-1 text-sm">Política de privacidad</span>
           </a>
           <div className="ml-12 h-px bg-glass-border" />
           <button
@@ -309,9 +351,12 @@ function Settings() {
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <LogOut className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1">Cerrar sesión</span>
+            <span className="flex-1 text-sm">Cerrar sesión</span>
           </button>
         </div>
+
+        {/* Spacer to keep destructive action far from logout */}
+        <div className="h-16" />
 
         <button
           onClick={() => setConfirmDelete(true)}
@@ -320,6 +365,7 @@ function Settings() {
           <Trash2 className="h-4 w-4" /> Eliminar cuenta
         </button>
       </div>
+
 
       <ConfirmDialog
         open={confirmLogout}
