@@ -90,26 +90,39 @@ function ChatRoom() {
     const loadHeader = async () => {
       const { data: conv } = await supabase
         .from("conversations")
-        .select("kind, channels(name, description)")
+        .select("kind, channel_id")
         .eq("id", id)
         .single();
       if (!conv) return;
-      if (conv.kind === "channel" && conv.channels) {
-        const ch = conv.channels as { name: string; description: string | null };
-        setTitle(`# ${ch.name}`);
-        setSubtitle(ch.description ?? "");
+      if (conv.kind === "channel" && conv.channel_id) {
+        const { data: ch } = await supabase
+          .from("channels")
+          .select("name, description")
+          .eq("id", conv.channel_id)
+          .single();
+        if (ch) {
+          setTitle(`# ${ch.name}`);
+          setSubtitle(ch.description ?? "");
+        }
       } else {
         const { data: peers } = await supabase
           .from("conversation_members")
-          .select("user_id, profiles(display_name, avatar_url)")
+          .select("user_id")
           .eq("conversation_id", id)
           .neq("user_id", user.id)
           .limit(1);
-        const p = peers?.[0] as { profiles: { display_name: string; avatar_url: string | null } | null } | undefined;
-        if (p?.profiles) {
-          setTitle(p.profiles.display_name);
-          setAvatar(p.profiles.avatar_url);
-          setSubtitle("En línea");
+        const peerId = peers?.[0]?.user_id;
+        if (peerId) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("display_name, avatar_url")
+            .eq("id", peerId)
+            .single();
+          if (prof) {
+            setTitle(prof.display_name);
+            setAvatar(prof.avatar_url);
+            setSubtitle("En línea");
+          }
         }
       }
     };
