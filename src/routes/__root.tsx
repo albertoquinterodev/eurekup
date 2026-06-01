@@ -72,12 +72,8 @@ function RootComponent() {
     <ThemeProvider>
       <AuthProvider>
         <Outlet />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            className: "!glass-strong !rounded-2xl !text-foreground !border-glass-border",
-          }}
-        />
+        <Toaster />
+
       </AuthProvider>
     </ThemeProvider>
   );
