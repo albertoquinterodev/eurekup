@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles } from "lucide-react";
+import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles, ChevronDown, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
