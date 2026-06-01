@@ -457,10 +457,8 @@ function ChatRoom() {
   };
   const doMove = async (folderId: string | null) => {
     if (!moveFile || !user) return;
-    // Ensure user owns this file (if it was sent by peer, clone first).
-    let targetId = moveFile.id;
     if (!moveFile.storage_path.startsWith(`${user.id}/`)) {
-      const { data: cloned, error } = await supabase
+      const { error } = await supabase
         .from("files")
         .insert({
           owner_id: user.id,
@@ -469,16 +467,13 @@ function ChatRoom() {
           storage_path: moveFile.storage_path,
           mime_type: moveFile.mime_type,
           size_bytes: moveFile.size_bytes,
-        })
-        .select("id")
-        .single();
-      if (error || !cloned) {
+        });
+      if (error) {
         toast.error("No se pudo mover");
         return;
       }
-      targetId = cloned.id;
     } else {
-      const { error } = await supabase.from("files").update({ folder_id: folderId }).eq("id", targetId);
+      const { error } = await supabase.from("files").update({ folder_id: folderId }).eq("id", moveFile.id);
       if (error) {
         toast.error("No se pudo mover");
         return;
@@ -488,6 +483,7 @@ function ChatRoom() {
     setMoveFile(null);
   };
 
+  return (
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-background">
       {/* Header */}
       <header className="shrink-0 safe-top">
