@@ -17,6 +17,10 @@ import {
   Film,
   File as FileIcon,
   MoreVertical,
+  Copy,
+  Forward,
+  FolderInput,
+  Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
