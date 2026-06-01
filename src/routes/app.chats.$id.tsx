@@ -579,11 +579,11 @@ function ChatRoom() {
                       </div>
                     </div>
 
-                    {/* Action button — visible on hover (desktop) and always on touch via menu toggle */}
+                    {/* Action button — only visible on hover (desktop). Mobile uses long-press on the bubble. */}
                     {!isDeleted && (
                       <button
                         onClick={() => setOpenMenuFor(openMenuFor === m.id ? null : m.id)}
-                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} flex h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft hover:bg-glass`}
+                        className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} hidden h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft transition-opacity duration-200 hover:bg-glass md:flex md:opacity-0 md:group-hover:opacity-100 ${openMenuFor === m.id ? "md:opacity-100" : ""}`}
                         aria-label="Acciones"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
@@ -593,10 +593,24 @@ function ChatRoom() {
                     {/* Action menu */}
                     {openMenuFor === m.id && !isDeleted && (
                       <div
-                        className={`absolute z-20 mt-1 min-w-48 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
+                        className={`absolute z-20 mt-1 min-w-52 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
                           mine ? "right-0" : "left-0"
                         } top-full`}
                       >
+                        {!m.file && (
+                          <button
+                            onClick={() => copyMessage(m)}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                          >
+                            <Copy className="h-4 w-4" /> Copiar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => forwardMessage(m)}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                        >
+                          <Forward className="h-4 w-4" /> Reenviar
+                        </button>
                         {mine && m.body !== null && !m.file && (
                           <button
                             onClick={() => startEdit(m)}
@@ -605,25 +619,25 @@ function ChatRoom() {
                             <Pencil className="h-4 w-4" /> Editar
                           </button>
                         )}
-                        <button
-                          onClick={() => shareMessage(m)}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
-                        >
-                          <Share2 className="h-4 w-4" /> Compartir
-                        </button>
                         {m.file && (
                           <>
                             <button
                               onClick={() => downloadFile(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <FileIcon className="h-4 w-4" /> Guardar en dispositivo
+                              <Download className="h-4 w-4" /> Descargar
+                            </button>
+                            <button
+                              onClick={() => openMoveFor(m.file!)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
+                            >
+                              <FolderInput className="h-4 w-4" /> Mover a carpeta
                             </button>
                             <button
                               onClick={() => saveToEurekup(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <FileText className="h-4 w-4" /> Guardar en Eurekup
+                              <Share2 className="h-4 w-4" /> Guardar en Eurekup
                             </button>
                           </>
                         )}
