@@ -726,6 +726,44 @@ function ChatRoom() {
           </button>
         </div>
       </div>
+
+      {/* Move-to-folder modal */}
+      {moveFile && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-md" onClick={() => setMoveFile(null)} />
+          <div className="glass-strong relative flex max-h-[70dvh] w-full max-w-sm flex-col rounded-3xl p-5 animate-slide-up backdrop-blur-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Mover a carpeta</h2>
+              <button onClick={() => setMoveFile(null)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{moveFile.name}</p>
+            <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
+              <button
+                onClick={() => doMove(null)}
+                className="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm hover:bg-glass"
+              >
+                <FolderInput className="h-4 w-4 text-muted-foreground" /> Raíz (sin carpeta)
+              </button>
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => doMove(f.id)}
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm hover:bg-glass"
+                >
+                  <FolderInput className="h-4 w-4 text-muted-foreground" /> {f.name}
+                </button>
+              ))}
+              {folders.length === 0 && (
+                <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  No tienes carpetas. Se guardará en la raíz.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
