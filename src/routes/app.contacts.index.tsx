@@ -220,7 +220,24 @@ function Contacts() {
         )}
       </div>
 
-      <Fab onClick={() => setShowAdd(true)} icon={UserPlus} label="Añadir contacto" />
+      {/* Stacked FABs: New contact + Create channel */}
+      <div className="fixed bottom-24 right-5 z-40 flex flex-col items-end gap-3">
+        <button
+          onClick={() => navigate({ to: "/app/channels" })}
+          className="flex h-12 w-12 items-center justify-center rounded-full glass-strong text-foreground shadow-elevated transition-all duration-200 hover:scale-105 active:scale-95 backdrop-blur-2xl"
+          aria-label="Crear canal"
+          title="Crear o explorar canal"
+        >
+          <Hash className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated transition-all duration-200 hover:scale-105 active:scale-95"
+          aria-label="Añadir contacto"
+        >
+          <UserPlus className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+      </div>
 
       {/* Add modal */}
       {showAdd && (
