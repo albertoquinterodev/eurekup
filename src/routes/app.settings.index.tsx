@@ -34,6 +34,16 @@ function Settings() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
+  const [showInviteEmail, setShowInviteEmail] = useState(false);
+  const [lang, setLang] = useState<string>(() => {
+    if (typeof window === "undefined") return "es";
+    return localStorage.getItem("eurekup_lang") ?? "es";
+  });
+  const setLanguage = (code: string) => {
+    setLang(code);
+    if (typeof window !== "undefined") localStorage.setItem("eurekup_lang", code);
+    toast.success("Idioma actualizado");
+  };
 
   useEffect(() => {
     if (!user) return;
