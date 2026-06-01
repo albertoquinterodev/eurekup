@@ -312,26 +312,6 @@ function ChatRoom() {
     );
   };
 
-  const shareMessage = async (m: Message) => {
-    setOpenMenuFor(null);
-    let textToShare = m.body ?? "";
-    if (m.file) textToShare = `${m.file.name}`;
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "Eurekup", text: textToShare, url });
-        return;
-      } catch {
-        // fallthrough to clipboard
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(`${textToShare}\n${url}`);
-      toast.success("Mensaje copiado");
-    } catch {
-      toast.error("No se pudo compartir");
-    }
-  };
 
   const startEdit = (m: Message) => {
     setOpenMenuFor(null);
