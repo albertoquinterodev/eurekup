@@ -2,6 +2,8 @@ import { Outlet, createRootRoute, HeadContent, Scripts, Link } from "@tanstack/r
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { I18nProvider } from "@/lib/i18n";
+import { PresenceProvider } from "@/hooks/use-presence";
 
 import appCss from "../styles.css?url";
 
@@ -70,11 +72,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <Outlet />
-        <Toaster />
-
-      </AuthProvider>
+      <I18nProvider>
+        <AuthProvider>
+          <PresenceProvider>
+            <Outlet />
+            <Toaster />
+          </PresenceProvider>
+        </AuthProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
