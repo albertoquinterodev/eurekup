@@ -278,6 +278,7 @@ export type Database = {
           edited_at: string | null
           file_id: string | null
           id: string
+          scheduled_at: string | null
           sender_id: string
           status: Database["public"]["Enums"]["message_status"]
         }
@@ -289,6 +290,7 @@ export type Database = {
           edited_at?: string | null
           file_id?: string | null
           id?: string
+          scheduled_at?: string | null
           sender_id: string
           status?: Database["public"]["Enums"]["message_status"]
         }
@@ -300,6 +302,7 @@ export type Database = {
           edited_at?: string | null
           file_id?: string | null
           id?: string
+          scheduled_at?: string | null
           sender_id?: string
           status?: Database["public"]["Enums"]["message_status"]
         }
@@ -353,6 +356,7 @@ export type Database = {
           display_name: string
           email: string
           id: string
+          last_seen_at: string | null
           referral_code: string
           referred_by: string | null
           updated_at: string
@@ -363,6 +367,7 @@ export type Database = {
           display_name: string
           email: string
           id: string
+          last_seen_at?: string | null
           referral_code: string
           referred_by?: string | null
           updated_at?: string
@@ -373,6 +378,7 @@ export type Database = {
           display_name?: string
           email?: string
           id?: string
+          last_seen_at?: string | null
           referral_code?: string
           referred_by?: string | null
           updated_at?: string
