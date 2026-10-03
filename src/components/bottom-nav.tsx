@@ -1,17 +1,18 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { MessagesSquare, Users, FolderClosed, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const items = [
-  { to: "/app/chats", label: "Chats", icon: MessagesSquare },
-  { to: "/app/contacts", label: "Contactos", icon: Users },
-  { to: "/app/storage", label: "Archivos", icon: FolderClosed },
-  { to: "/app/settings", label: "Ajustes", icon: Settings },
+  { to: "/app/chats", key: "nav.chats", icon: MessagesSquare },
+  { to: "/app/contacts", key: "nav.contacts", icon: Users },
+  { to: "/app/storage", key: "nav.storage", icon: FolderClosed },
+  { to: "/app/settings", key: "nav.settings", icon: Settings },
 ] as const;
 
 export function BottomNav() {
   const location = useLocation();
-  // Hide on chat room (full-bleed composer needs the space).
+  const { t } = useT();
   const inChatRoom = /^\/app\/chats\/[^/]+/.test(location.pathname);
   if (inChatRoom) return null;
   return (
@@ -20,6 +21,7 @@ export function BottomNav() {
         {items.map((it) => {
           const active = location.pathname.startsWith(it.to);
           const Icon = it.icon;
+          const label = t(it.key);
           return (
             <Link
               key={it.to}
@@ -30,10 +32,10 @@ export function BottomNav() {
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-glass"
               )}
-              aria-label={it.label}
+              aria-label={label}
             >
               <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
-              <span className="hidden text-sm font-medium sm:inline">{it.label}</span>
+              <span className="hidden text-sm font-medium sm:inline">{label}</span>
             </Link>
           );
         })}

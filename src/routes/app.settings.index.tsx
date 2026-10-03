@@ -35,14 +35,11 @@ function Settings() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
   const [showInviteEmail, setShowInviteEmail] = useState(false);
-  const [lang, setLang] = useState<string>(() => {
-    if (typeof window === "undefined") return "es";
-    return localStorage.getItem("eurekup_lang") ?? "es";
-  });
+  const { lang, setLang, t } = useT();
   const setLanguage = (code: string) => {
+    if (code !== "es" && code !== "en") return;
     setLang(code);
-    if (typeof window !== "undefined") localStorage.setItem("eurekup_lang", code);
-    toast.success("Idioma actualizado");
+    toast.success(code === "en" ? "Language updated" : "Idioma actualizado");
   };
 
   useEffect(() => {
@@ -296,8 +293,7 @@ function Settings() {
           <div className="px-5 py-4">
             <div className="flex items-center gap-3">
               <Globe className="h-5 w-5 text-muted-foreground" />
-              <span className="flex-1 text-sm">Idioma</span>
-              <span className="text-xs text-muted-foreground">i18n</span>
+              <span className="flex-1 text-sm">{t("settings.language")}</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {[
