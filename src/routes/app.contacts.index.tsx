@@ -25,6 +25,7 @@ const emailSchema = z.string().trim().email("Email inválido").max(255);
 
 function Contacts() {
   const { user } = useAuth();
+  const online = useOnlineSet();
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
