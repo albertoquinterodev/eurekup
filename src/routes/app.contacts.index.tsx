@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
 import { Avatar } from "@/components/avatar-bubble";
+import { useOnlineSet } from "@/hooks/use-presence";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -24,6 +25,7 @@ const emailSchema = z.string().trim().email("Email inválido").max(255);
 
 function Contacts() {
   const { user } = useAuth();
+  const online = useOnlineSet();
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +185,7 @@ function Contacts() {
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     aria-label={`Abrir chat con ${c.profile.display_name}`}
                   >
-                    <Avatar name={c.profile.display_name} url={c.profile.avatar_url} />
+                    <Avatar name={c.profile.display_name} url={c.profile.avatar_url} online={online.has(c.contact_user_id)} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{c.profile.display_name}</p>
                       <p className="truncate text-xs text-muted-foreground">{c.profile.email}</p>

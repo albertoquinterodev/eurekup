@@ -26,6 +26,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar } from "@/components/avatar-bubble";
 import { formatTime } from "@/lib/format";
+import { useIsOnline } from "@/hooks/use-presence";
+import { useT } from "@/lib/i18n";
+import { isFutureSchedule } from "@/lib/password";
+import { CalendarClock } from "lucide-react";
 
 export const Route = createFileRoute("/app/chats/$id")({
   component: ChatRoom,
@@ -49,6 +53,7 @@ interface Message {
   deleted_at: string | null;
   file_id: string | null;
   file?: FileMeta | null;
+  scheduled_at?: string | null;
 }
 
 function fileIconFor(mime: string | null) {
@@ -73,6 +78,16 @@ function ChatRoom() {
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { t, lang } = useT();
+  const [peerId, setPeerId] = useState<string | null>(null);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
+  const peerOnline = useIsOnline(peerId);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const sendLp = useRef<number | null>(null);
+  const [tick, setTick] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hydrate file metadata for messages that include file_id.
@@ -119,13 +134,14 @@ function ChatRoom() {
         if (peerId) {
           const { data: prof } = await supabase
             .from("profiles")
-            .select("display_name, avatar_url")
+            .select("display_name, avatar_url, last_seen_at")
             .eq("id", peerId)
             .single();
           if (prof) {
             setTitle(prof.display_name);
             setAvatar(prof.avatar_url);
-            setSubtitle("En línea");
+            setPeerId(peerId);
+            setLastSeen(prof.last_seen_at);
           }
         }
       }
@@ -134,7 +150,7 @@ function ChatRoom() {
     const loadMessages = async () => {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id")
+        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id, scheduled_at")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
       if (error) {
@@ -196,7 +212,48 @@ function ChatRoom() {
     };
   }, [id, user]);
 
-  const send = async () => {
+  // Signed thumbnails for image attachments.
+  useEffect(() => {
+    const missing = messages.filter((m) => m.file?.mime_type?.startsWith("image/") && !thumbs[m.file.id]);
+    if (!missing.length) return;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (m) => {
+          const { data } = await supabase.storage
+            .from("files")
+            .createSignedUrl(m.file!.storage_path, 3600, { transform: { width: 480, quality: 70 } });
+          return [m.file!.id, data?.signedUrl ?? ""] as const;
+        })
+      );
+      setThumbs((p) => ({ ...p, ...Object.fromEntries(entries.filter(([, u]) => u)) }));
+    })();
+  }, [messages, thumbs]);
+
+  // Periodically reveal scheduled messages that became due.
+  useEffect(() => {
+    const iv = window.setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => window.clearInterval(iv);
+  }, []);
+  useEffect(() => {
+    if (!tick || !user) return;
+    supabase
+      .from("messages")
+      .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id, scheduled_at")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true })
+      .then(async ({ data }) => {
+        if (!data) return;
+        const known = new Set(messages.map((m) => m.id));
+        const fresh = (data as Message[]).filter((m) => !known.has(m.id));
+        if (fresh.length) {
+          const h = await hydrateFiles(fresh);
+          setMessages((p) => [...p, ...h].sort((a, b) => a.created_at.localeCompare(b.created_at)));
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  const send = async (scheduledAt?: Date) => {
     if (!text.trim() || !user) return;
     if (editing) {
       // Save edit
@@ -227,13 +284,20 @@ function ChatRoom() {
     try {
       const { data, error } = await supabase
         .from("messages")
-        .insert({ conversation_id: id, sender_id: user.id, body, status: "delivered" })
-        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id")
+        .insert({
+          conversation_id: id,
+          sender_id: user.id,
+          body,
+          status: "delivered",
+          scheduled_at: scheduledAt ? scheduledAt.toISOString() : null,
+        })
+        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id, scheduled_at")
         .single();
       if (error) throw error;
       setMessages((prev) =>
         prev.some((m) => m.id === data.id) ? prev : [...prev, { ...(data as Message), file: null }]
       );
+      if (scheduledAt) toast.success(t("chat.scheduledOk"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar");
       setText(body);
@@ -281,7 +345,7 @@ function ChatRoom() {
           file_id: fileRow.id,
           status: "delivered",
         })
-        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id")
+        .select("id, body, sender_id, status, created_at, edited_at, deleted_at, file_id, scheduled_at")
         .single();
       if (msgErr) throw msgErr;
       setMessages((prev) =>
@@ -330,7 +394,8 @@ function ChatRoom() {
       toast.error("No se pudo abrir");
       return;
     }
-    window.open(data.signedUrl, "_blank");
+    if (file.mime_type?.startsWith("image/")) setLightbox(data.signedUrl);
+    else window.open(data.signedUrl, "_blank", "noopener");
   };
 
   const downloadFile = async (file: FileMeta) => {
@@ -475,10 +540,20 @@ function ChatRoom() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <Avatar name={title} url={avatar} online />
+          <Avatar name={title} url={avatar} online={peerId ? peerOnline : undefined} />
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold">{title}</p>
-            {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+            {peerId ? (
+              <p className={`truncate text-xs ${peerOnline ? "text-success" : "text-muted-foreground"}`}>
+                {peerOnline
+                  ? t("chat.online")
+                  : lastSeen
+                  ? `${t("chat.lastSeen")} ${new Date(lastSeen).toLocaleString(lang, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                  : t("chat.offline")}
+              </p>
+            ) : (
+              subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+            )}
           </div>
         </div>
       </header>
@@ -492,7 +567,7 @@ function ChatRoom() {
         ) : messages.length === 0 ? (
           <div className="glass mx-auto max-w-sm rounded-3xl px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              Aún no hay mensajes. Escribe el primero ✨
+              {t("chat.empty")}
             </p>
           </div>
         ) : (
@@ -531,7 +606,11 @@ function ChatRoom() {
                       } ${isDeleted ? "italic opacity-70" : ""}`}
                     >
                       {isDeleted ? (
-                        <p>Mensaje eliminado</p>
+                        <p>{t("chat.deleted")}</p>
+                      ) : m.file && m.file.mime_type?.startsWith("image/") && thumbs[m.file.id] ? (
+                        <button onClick={() => setLightbox(thumbs[m.file!.id])} className="-mx-2 -mt-1 block overflow-hidden rounded-xl">
+                          <img src={thumbs[m.file.id]} alt={m.file.name} loading="lazy" className="max-h-64 w-full max-w-xs object-cover" />
+                        </button>
                       ) : m.file ? (
                         <button
                           onClick={() => openFile(m.file!)}
@@ -559,7 +638,10 @@ function ChatRoom() {
                           mine ? "text-primary-foreground/60" : "text-muted-foreground"
                         }`}
                       >
-                        {!isDeleted && m.edited_at && <span className="italic">(editado)</span>}
+                        {!isDeleted && m.edited_at && <span className="italic">{t("chat.edited")}</span>}
+                        {m.scheduled_at && new Date(m.scheduled_at) > new Date() && (
+                          <span className="flex items-center gap-0.5"><CalendarClock className="h-3 w-3" />{t("chat.pending")} · {new Date(m.scheduled_at).toLocaleString(lang, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        )}
                         <span>{formatTime(m.created_at)}</span>
                         {mine &&
                           !isDeleted &&
@@ -589,28 +671,28 @@ function ChatRoom() {
                       <div
                         className={`absolute z-20 mt-1 min-w-52 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
                           mine ? "right-0" : "left-0"
-                        } top-full`}
+                        } ${i >= messages.length - 3 ? "bottom-full mb-1" : "top-full"}`}
                       >
                         {!m.file && (
                           <button
                             onClick={() => copyMessage(m)}
                             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                           >
-                            <Copy className="h-4 w-4" /> Copiar
+                            <Copy className="h-4 w-4" /> {t("chat.copy")}
                           </button>
                         )}
                         <button
                           onClick={() => forwardMessage(m)}
                           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                         >
-                          <Forward className="h-4 w-4" /> Reenviar
+                          <Forward className="h-4 w-4" /> {t("chat.forward")}
                         </button>
                         {mine && m.body !== null && !m.file && (
                           <button
                             onClick={() => startEdit(m)}
                             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                           >
-                            <Pencil className="h-4 w-4" /> Editar
+                            <Pencil className="h-4 w-4" /> {t("chat.edit")}
                           </button>
                         )}
                         {m.file && (
@@ -619,19 +701,19 @@ function ChatRoom() {
                               onClick={() => downloadFile(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <Download className="h-4 w-4" /> Descargar
+                              <Download className="h-4 w-4" /> {t("chat.download")}
                             </button>
                             <button
                               onClick={() => openMoveFor(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <FolderInput className="h-4 w-4" /> Mover a carpeta
+                              <FolderInput className="h-4 w-4" /> {t("chat.move")}
                             </button>
                             <button
                               onClick={() => saveToEurekup(m.file!)}
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-glass"
                             >
-                              <Share2 className="h-4 w-4" /> Guardar en Eurekup
+                              <Share2 className="h-4 w-4" /> {t("chat.saveEurekup")}
                             </button>
                           </>
                         )}
@@ -640,7 +722,7 @@ function ChatRoom() {
                             onClick={() => deleteMessage(m)}
                             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-destructive hover:bg-destructive/10"
                           >
-                            <Trash2 className="h-4 w-4" /> Eliminar
+                            <Trash2 className="h-4 w-4" /> {t("chat.delete")}
                           </button>
                         )}
                       </div>
@@ -658,7 +740,7 @@ function ChatRoom() {
         {editing && (
           <div className="glass mx-auto mb-2 flex max-w-2xl items-center gap-2 rounded-2xl px-3 py-2 text-xs">
             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="flex-1 truncate text-muted-foreground">Editando mensaje</span>
+            <span className="flex-1 truncate text-muted-foreground">{t("chat.editing")}</span>
             <button onClick={cancelEdit} className="rounded-full p-1 hover:bg-glass-strong">
               <X className="h-3.5 w-3.5" />
             </button>
@@ -692,12 +774,26 @@ function ChatRoom() {
                 send();
               }
             }}
-            placeholder={editing ? "Edita tu mensaje…" : "Escribe un mensaje…"}
+            placeholder={editing ? t("chat.editPlaceholder") : t("chat.placeholder")}
             rows={1}
             className="max-h-32 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none"
           />
           <button
-            onClick={send}
+            onClick={() => send()}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (text.trim() && !editing) setScheduleOpen(true);
+            }}
+            onTouchStart={() => {
+              sendLp.current = window.setTimeout(() => {
+                if (text.trim() && !editing) setScheduleOpen(true);
+              }, 500);
+            }}
+            onTouchEnd={(e) => {
+              if (sendLp.current) window.clearTimeout(sendLp.current);
+              if (scheduleOpen) e.preventDefault();
+            }}
+            title={t("chat.scheduleHint")}
             disabled={sending || !text.trim()}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95 disabled:opacity-40"
             aria-label={editing ? "Guardar" : "Enviar"}
@@ -706,6 +802,64 @@ function ChatRoom() {
           </button>
         </div>
       </div>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 p-4 backdrop-blur-xl animate-fade-in"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            aria-label={t("common.close")}
+            className="glass absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full safe-top"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightbox}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90dvh] max-w-full touch-pinch-zoom rounded-2xl object-contain shadow-elevated"
+          />
+        </div>
+      )}
+
+      {scheduleOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-md" onClick={() => setScheduleOpen(false)} />
+          <div className="glass-strong relative w-full max-w-sm space-y-4 rounded-3xl p-5 animate-slide-up">
+            <h2 className="flex items-center gap-2 text-base font-semibold"><CalendarClock className="h-4 w-4" />{t("chat.schedule")}</h2>
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className="w-full rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {scheduleAt && (
+              <p className="text-xs text-muted-foreground">
+                {t("chat.scheduledFor")} {new Date(scheduleAt).toLocaleString(lang, { dateStyle: "full", timeStyle: "short" })}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setScheduleOpen(false)} className="flex-1 rounded-full glass-subtle py-2.5 text-sm">{t("common.cancel")}</button>
+              <button
+                onClick={() => {
+                  const d = new Date(scheduleAt);
+                  if (!isFutureSchedule(d)) return toast.error(t("chat.scheduleFuture"));
+                  setScheduleOpen(false);
+                  setScheduleAt("");
+                  send(d);
+                }}
+                className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+              >
+                {t("common.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Move-to-folder modal */}
       {moveFile && (
