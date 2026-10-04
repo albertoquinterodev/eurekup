@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useT } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
