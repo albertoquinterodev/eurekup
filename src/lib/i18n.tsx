@@ -150,6 +150,8 @@ interface I18nCtx {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (k: TKey) => string;
+  /** Inline translation: tr("Hola", "Hello") */
+  tr: (es: string, en: string) => string;
 }
 
 const Ctx = createContext<I18nCtx | null>(null);
@@ -168,7 +170,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, l);
   }, []);
   const t = useCallback((k: TKey) => dict[lang][k] ?? dict.es[k] ?? k, [lang]);
-  return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>;
+  const tr = useCallback((es: string, en: string) => (lang === "en" ? en : es), [lang]);
+  return <Ctx.Provider value={{ lang, setLang, t, tr }}>{children}</Ctx.Provider>;
 }
 
 export function useT() {

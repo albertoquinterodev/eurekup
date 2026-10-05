@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import { X, AlertTriangle } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -17,11 +18,14 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirmar",
-  cancelLabel = "Cancelar",
+  confirmLabel,
+  cancelLabel,
   destructive,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { tr } = useT();
+  const resolvedConfirmLabel = confirmLabel ?? tr("Confirmar", "Confirm");
+  const resolvedCancelLabel = cancelLabel ?? tr("Cancelar", "Cancel");
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -42,7 +46,7 @@ export function ConfirmDialog({
         <button
           onClick={() => onOpenChange(false)}
           className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-glass hover:text-foreground"
-          aria-label="Cerrar"
+          aria-label={tr("Cerrar", "Close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -60,7 +64,7 @@ export function ConfirmDialog({
             onClick={() => onOpenChange(false)}
             className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium text-foreground hover:bg-glass"
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             onClick={async () => {
@@ -73,7 +77,7 @@ export function ConfirmDialog({
                 : "bg-primary text-primary-foreground hover:opacity-90"
             }`}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

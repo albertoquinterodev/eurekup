@@ -3,7 +3,7 @@ import { useT } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles, ChevronDown, Globe } from "lucide-react";
+import { LogOut, Mail, Trash2, Shield, Gift, Hash, Loader2, Copy, Sun, Moon, Crown, Check, Sparkles, ChevronDown, Globe, Pencil, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -18,15 +18,19 @@ export const Route = createFileRoute("/app/settings/")({
 
 interface Profile {
   display_name: string;
-  email: string;
+  username: string;
   avatar_url: string | null;
   referral_code: string;
 }
+
+const nameSchema = z.string().trim().min(1).max(60);
+const nickSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/);
 
 function Settings() {
   const { user, signOut } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const { lang, setLang, t, tr } = useT();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [quota, setQuota] = useState({ used: 0, total: 0 });
   const [referrals, setReferrals] = useState<{ verified: number; pending: number }>({ verified: 0, pending: 0 });
@@ -36,7 +40,11 @@ function Settings() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
   const [showInviteEmail, setShowInviteEmail] = useState(false);
-  const { lang, setLang, t } = useT();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editNick, setEditNick] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const setLanguage = (code: string) => {
     if (code !== "es" && code !== "en") return;
     setLang(code);
@@ -47,7 +55,7 @@ function Settings() {
     if (!user) return;
     const load = async () => {
       const [{ data: p }, { data: q }, { data: refs }] = await Promise.all([
-        supabase.from("profiles").select("display_name, email, avatar_url, referral_code").eq("id", user.id).single(),
+        supabase.from("profiles").select("display_name, username, avatar_url, referral_code").eq("id", user.id).single(),
         supabase.from("storage_quota").select("used_bytes, total_bytes").eq("user_id", user.id).single(),
         supabase.from("referrals").select("status").eq("referrer_id", user.id),
       ]);
@@ -63,36 +71,60 @@ function Settings() {
     load();
   }, [user]);
 
+  const openEdit = () => {
+    if (!profile) return;
+    setEditName(profile.display_name);
+    setEditNick(profile.username);
+    setEditOpen(true);
+  };
+
+  const saveProfile = async () => {
+    if (!user || !profile) return;
+    const n = nameSchema.safeParse(editName);
+    if (!n.success) return toast.error(tr("El nombre es obligatorio (máx. 60).", "Name is required (max 60)."));
+    const k = nickSchema.safeParse(editNick.replace(/^@/, ""));
+    if (!k.success) return toast.error(tr("Nick inválido: 3–24 letras minúsculas, números o _.", "Invalid nick: 3–24 lowercase letters, numbers or _."));
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: n.data, username: k.data, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) {
+      if (error.code === "23505") return toast.error(tr("Ese nick ya está en uso.", "That nick is already taken."));
+      return toast.error(error.message);
+    }
+    setProfile({ ...profile, display_name: n.data, username: k.data });
+    setEditOpen(false);
+    toast.success(tr("Perfil actualizado.", "Profile updated."));
+  };
+
   const invite = async () => {
     const parsed = z.string().trim().email().max(255).safeParse(inviteEmail);
     if (!parsed.success) {
-      toast.error("Email inválido");
+      toast.error(tr("Email inválido.", "Invalid email."));
       return;
     }
     if (!user || !profile) return;
     setInviting(true);
     try {
       const target = parsed.data.toLowerCase();
-      const { error } = await supabase.from("referrals").insert({
-        referrer_id: user.id,
-        invited_email: target,
-      });
+      const { error } = await supabase.from("referrals").insert({ referrer_id: user.id, invited_email: target });
       if (error) {
-        if (error.message.includes("duplicate")) {
-          toast.message("Ya invitaste a este email");
-        } else {
-          throw error;
-        }
+        if (error.message.includes("duplicate")) toast.message(tr("Ya invitaste a este email.", "You already invited this email."));
+        else throw error;
       } else {
-        // Open mailto so user can send the invitation right away
-        const subject = encodeURIComponent("Te invito a Eurekup");
+        const subject = encodeURIComponent(tr("Te invito a EurekUp", "Join me on EurekUp"));
         const body = encodeURIComponent(
-          `Hola,\n\nQuiero invitarte a Eurekup, una app que combina chats y archivos.\nUsa mi código de referido al registrarte: ${profile.referral_code}\n\nÚnete: ${window.location.origin}/auth\n\n— ${profile.display_name}`
+          tr(
+            `Hola,\n\nQuiero invitarte a EurekUp, una app que combina chats y archivos.\nUsa mi código de referido al registrarte: ${profile.referral_code}\n\nÚnete: ${window.location.origin}/auth\n\n— ${profile.display_name}`,
+            `Hi,\n\nI'd like to invite you to EurekUp, an app that combines chats and files.\nUse my referral code when you sign up: ${profile.referral_code}\n\nJoin: ${window.location.origin}/auth\n\n— ${profile.display_name}`
+          )
         );
         window.location.href = `mailto:${target}?subject=${subject}&body=${body}`;
         setReferrals((r) => ({ ...r, pending: r.pending + 1 }));
         setInviteEmail("");
-        toast.success("Invitación lista para enviar");
+        toast.success(tr("Invitación lista para enviar.", "Invitation ready to send."));
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -104,29 +136,29 @@ function Settings() {
   const copyCode = () => {
     if (!profile) return;
     navigator.clipboard.writeText(profile.referral_code);
-    toast.success("Código copiado");
+    toast.success(tr("Código copiado.", "Code copied."));
   };
 
   const copyInviteLink = () => {
     if (!profile) return;
-    const link = `${window.location.origin}/auth?ref=${profile.referral_code}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Enlace de invitación copiado");
+    navigator.clipboard.writeText(`${window.location.origin}/auth?ref=${profile.referral_code}`);
+    toast.success(tr("Enlace de invitación copiado.", "Invite link copied."));
   };
 
   const shareInvite = async () => {
     if (!profile) return;
     const link = `${window.location.origin}/auth?ref=${profile.referral_code}`;
-    const text = `Únete a Eurekup conmigo y conseguimos +1 GB extra. Usa mi enlace: ${link}`;
+    const text = tr(
+      `Únete a EurekUp conmigo y conseguimos +1 GB extra. Usa mi enlace: ${link}`,
+      `Join me on EurekUp and we both get +1 GB. Use my link: ${link}`
+    );
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Eurekup", text, url: link });
+        await navigator.share({ title: "EurekUp", text, url: link });
       } catch {
-        // user cancelled
+        // cancelled
       }
-    } else {
-      copyInviteLink();
-    }
+    } else copyInviteLink();
   };
 
   const logout = async () => {
@@ -136,18 +168,18 @@ function Settings() {
 
   const deleteAccount = async () => {
     if (!user) return;
-    // Sign out + delete profile (cascade removes data). Auth user removal needs admin.
     await supabase.from("profiles").delete().eq("id", user.id);
     await signOut();
-    toast.success("Cuenta eliminada");
+    toast.success(tr("Cuenta eliminada.", "Account deleted."));
     navigate({ to: "/" });
   };
 
   const usedPct = quota.total ? Math.min(100, (quota.used / quota.total) * 100) : 0;
+  const per = tr("/mes", "/mo");
 
   return (
     <>
-      <AppBar title="Ajustes" />
+      <AppBar title={tr("Ajustes", "Settings")} />
 
       <div className="space-y-3 px-3 pb-4 pt-3">
         {/* Profile */}
@@ -157,20 +189,28 @@ function Settings() {
               <Avatar name={profile.display_name} url={profile.avatar_url} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-lg font-semibold">{profile.display_name}</p>
-                <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+                <p className="truncate text-sm text-muted-foreground">@{profile.username}</p>
               </div>
+              <button
+                onClick={openEdit}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-subtle hover:bg-glass"
+                aria-label={tr("Editar perfil", "Edit profile")}
+                title={tr("Editar perfil", "Edit profile")}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
             </div>
           ) : (
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           )}
         </div>
 
-        {/* Storage + Premium unified */}
+        {/* Storage + Premium */}
         <div className="glass relative overflow-hidden rounded-3xl p-5">
           <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
           <div className="relative">
             <div className="flex items-baseline justify-between">
-              <p className="text-sm font-medium">Almacenamiento</p>
+              <p className="text-sm font-medium">{tr("Almacenamiento", "Storage")}</p>
               <p className="text-sm">
                 <span className="font-semibold">{formatBytes(quota.used)}</span>{" "}
                 <span className="text-muted-foreground">/ {formatBytes(quota.total)}</span>
@@ -182,38 +222,41 @@ function Settings() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
                 <p className="text-lg font-semibold">+{Math.min(15, referrals.verified)} GB</p>
-                <p className="text-[11px] text-muted-foreground">Por verificados</p>
+                <p className="text-[11px] text-muted-foreground">{tr("Por verificados", "From verified")}</p>
               </div>
               <div className="glass-strong rounded-2xl px-3 py-2 text-center backdrop-blur-2xl">
                 <p className="text-lg font-semibold">{referrals.pending}</p>
-                <p className="text-[11px] text-muted-foreground">Pendientes</p>
+                <p className="text-[11px] text-muted-foreground">{tr("Pendientes", "Pending")}</p>
               </div>
             </div>
             <button
               onClick={() => setShowPremium(true)}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
             >
-              <Crown className="h-4 w-4" /> Pasar a Premium
+              <Crown className="h-4 w-4" /> {tr("Pasar a Premium", "Upgrade to Premium")}
               <Sparkles className="h-3.5 w-3.5 opacity-80" />
             </button>
             <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              Hasta 5 TB · O invita amigos para ganar +1 GB cada uno (máx. 15 GB).
+              {tr(
+                "Hasta 5 TB · O invita amigos para ganar +1 GB cada uno (máx. 15 GB).",
+                "Up to 5 TB · Or invite friends to earn +1 GB each (max 15 GB)."
+              )}
             </p>
           </div>
         </div>
 
-        {/* Referidos — simplificado */}
+        {/* Referrals */}
         <div className="glass rounded-3xl p-5">
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5" />
-            <p className="font-medium">Invita y gana espacio</p>
+            <p className="font-medium">{tr("Invita y gana espacio", "Invite and earn space")}</p>
           </div>
 
           {profile && (
             <button
               onClick={copyCode}
               className="mt-3 flex w-full items-center justify-between rounded-2xl glass-subtle px-4 py-3 text-sm transition hover:bg-glass"
-              title="Copiar código"
+              title={tr("Copiar código", "Copy code")}
             >
               <span className="flex items-center gap-2">
                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -228,7 +271,7 @@ function Settings() {
               onClick={shareInvite}
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-95"
             >
-              <Gift className="h-4 w-4" /> Compartir invitación
+              <Gift className="h-4 w-4" /> {tr("Compartir invitación", "Share invitation")}
             </button>
           )}
 
@@ -237,7 +280,7 @@ function Settings() {
             className="mt-2 flex w-full items-center justify-center gap-1 rounded-full px-3 py-2 text-xs text-muted-foreground hover:bg-glass"
             aria-expanded={showInviteEmail}
           >
-            <Mail className="h-3.5 w-3.5" /> Invitar por email
+            <Mail className="h-3.5 w-3.5" /> {tr("Invitar por email", "Invite by email")}
             <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showInviteEmail ? "rotate-180" : ""}`} />
           </button>
 
@@ -247,8 +290,8 @@ function Settings() {
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="email@amigo.com"
-                className="flex-1 rounded-full glass-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder={tr("email@amigo.com", "email@friend.com")}
+                className="min-w-0 flex-1 rounded-full glass-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <button
                 onClick={invite}
@@ -256,27 +299,22 @@ function Settings() {
                 className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Enviar
+                {tr("Enviar", "Send")}
               </button>
             </div>
           )}
         </div>
 
-        {/* Preferencias */}
+        {/* Preferences */}
         <div className="glass rounded-3xl overflow-hidden">
-          {/* Tema con switch */}
           <div className="flex w-full items-center gap-3 px-5 py-4">
-            {theme === "dark" ? (
-              <Moon className="h-5 w-5 text-muted-foreground" />
-            ) : (
-              <Sun className="h-5 w-5 text-muted-foreground" />
-            )}
-            <span className="flex-1 text-sm">Tema</span>
+            {theme === "dark" ? <Moon className="h-5 w-5 text-muted-foreground" /> : <Sun className="h-5 w-5 text-muted-foreground" />}
+            <span className="flex-1 text-sm">{tr("Tema", "Theme")}</span>
             <button
               onClick={toggleTheme}
               role="switch"
               aria-checked={theme === "dark"}
-              aria-label="Alternar tema"
+              aria-label={tr("Alternar tema", "Toggle theme")}
               className={`relative h-7 w-12 rounded-full transition-colors duration-200 ${theme === "dark" ? "bg-primary" : "bg-glass-strong"}`}
             >
               <span
@@ -290,7 +328,6 @@ function Settings() {
           </div>
           <div className="ml-12 h-px bg-glass-border" />
 
-          {/* Idioma */}
           <div className="px-5 py-4">
             <div className="flex items-center gap-3">
               <Globe className="h-5 w-5 text-muted-foreground" />
@@ -307,7 +344,7 @@ function Settings() {
               ].map((l) => (
                 <button
                   key={l.code}
-                  onClick={() => (l.ready ? setLanguage(l.code) : toast.info("Disponible próximamente"))}
+                  onClick={() => (l.ready ? setLanguage(l.code) : toast.info(t("settings.soon")))}
                   className={`rounded-2xl px-3 py-2 text-xs transition ${
                     lang === l.code
                       ? "bg-primary text-primary-foreground font-semibold"
@@ -328,60 +365,114 @@ function Settings() {
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <Hash className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1 text-sm">Explorar canales</span>
+            <span className="flex-1 text-sm">{tr("Explorar canales", "Explore channels")}</span>
           </button>
           <div className="ml-12 h-px bg-glass-border" />
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              toast.info("Política de privacidad disponible próximamente.");
-            }}
+          <button
+            onClick={() => toast.info(tr("Política de privacidad disponible próximamente.", "Privacy policy coming soon."))}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <Shield className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1 text-sm">Política de privacidad</span>
-          </a>
+            <span className="flex-1 text-sm">{tr("Política de privacidad", "Privacy policy")}</span>
+          </button>
           <div className="ml-12 h-px bg-glass-border" />
           <button
             onClick={() => setConfirmLogout(true)}
             className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-glass-strong"
           >
             <LogOut className="h-5 w-5 text-muted-foreground" />
-            <span className="flex-1 text-sm">Cerrar sesión</span>
+            <span className="flex-1 text-sm">{tr("Cerrar sesión", "Sign out")}</span>
           </button>
         </div>
 
-        {/* Spacer to keep destructive action far from logout */}
         <div className="h-16" />
 
         <button
           onClick={() => setConfirmDelete(true)}
           className="flex w-full items-center justify-center gap-2 rounded-3xl glass-subtle py-4 text-sm font-medium text-destructive hover:bg-destructive/10"
         >
-          <Trash2 className="h-4 w-4" /> Eliminar cuenta
+          <Trash2 className="h-4 w-4" /> {tr("Eliminar cuenta", "Delete account")}
         </button>
       </div>
-
 
       <ConfirmDialog
         open={confirmLogout}
         onOpenChange={setConfirmLogout}
-        title="Cerrar sesión"
-        description="Tendrás que volver a iniciar sesión para acceder a tus chats y archivos."
-        confirmLabel="Cerrar sesión"
+        title={tr("Cerrar sesión", "Sign out")}
+        description={tr(
+          "Tendrás que volver a iniciar sesión para acceder a tus chats y archivos.",
+          "You'll need to sign in again to access your chats and files."
+        )}
+        confirmLabel={tr("Cerrar sesión", "Sign out")}
         onConfirm={logout}
       />
 
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Eliminar cuenta"
-        description="Se eliminarán tu perfil, contactos, mensajes y archivos. Esta acción es irreversible."
-        confirmLabel="Eliminar todo"
+        title={tr("Eliminar cuenta", "Delete account")}
+        description={tr(
+          "Se eliminarán tu perfil, contactos, mensajes y archivos. Esta acción es irreversible.",
+          "Your profile, contacts, messages and files will be deleted. This can't be undone."
+        )}
+        confirmLabel={tr("Eliminar todo", "Delete everything")}
         destructive
         onConfirm={deleteAccount}
       />
+
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-md" onClick={() => setEditOpen(false)} />
+          <div className="glass-strong relative w-full max-w-sm space-y-4 rounded-3xl p-6 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{tr("Editar perfil", "Edit profile")}</h2>
+              <button onClick={() => setEditOpen(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label={t("common.close")}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{tr("Nombre", "Name")}</span>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value.slice(0, 60))}
+                className="w-full rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Nick</span>
+              <div className="flex items-center rounded-2xl glass-subtle px-4 focus-within:ring-2 focus-within:ring-ring">
+                <span className="text-sm text-muted-foreground">@</span>
+                <input
+                  value={editNick}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  onChange={(e) => setEditNick(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24))}
+                  className="w-full bg-transparent py-3 pl-1 text-sm focus:outline-none"
+                />
+              </div>
+              <span className="mt-1.5 block text-[11px] text-muted-foreground">
+                {tr(
+                  "3–24 caracteres: letras minúsculas, números y _. Tus contactos te encontrarán por tu nick.",
+                  "3–24 characters: lowercase letters, numbers and _. Contacts find you by your nick."
+                )}
+              </span>
+            </label>
+            <div className="flex gap-2">
+              <button onClick={() => setEditOpen(false)} className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium">
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={saveProfile}
+                disabled={saving}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {tr("Guardar", "Save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPremium && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
@@ -390,29 +481,27 @@ function Settings() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Crown className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">Eurekup Premium</h2>
+                <h2 className="text-lg font-semibold">EurekUp Premium</h2>
               </div>
-              <button onClick={() => setShowPremium(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
-                <span aria-hidden>✕</span>
+              <button onClick={() => setShowPremium(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label={t("common.close")}>
+                <X className="h-4 w-4" />
               </button>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Más espacio para tus archivos y conversaciones.
+              {tr("Más espacio para tus archivos y conversaciones.", "More space for your files and conversations.")}
             </p>
             <div className="mt-4 -mx-1 flex-1 space-y-2 overflow-y-auto px-1">
               {[
-                { size: "100 GB", price: "1,99 €", period: "/mes", highlight: false },
-                { size: "200 GB", price: "2,99 €", period: "/mes", highlight: true, badge: "Popular" },
-                { size: "1 TB", price: "9,99 €", period: "/mes", highlight: false },
-                { size: "5 TB", price: "24,99 €", period: "/mes", highlight: false },
+                { size: "100 GB", price: "1,99 €", highlight: false },
+                { size: "200 GB", price: "2,99 €", highlight: true, badge: "Popular" },
+                { size: "1 TB", price: "9,99 €", highlight: false },
+                { size: "5 TB", price: "24,99 €", highlight: false },
               ].map((plan) => (
                 <button
                   key={plan.size}
-                  onClick={() => toast.info("Pagos disponibles próximamente")}
+                  onClick={() => toast.info(tr("Pagos disponibles próximamente.", "Payments coming soon."))}
                   className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
-                    plan.highlight
-                      ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
-                      : "border-glass-border glass-subtle hover:bg-glass"
+                    plan.highlight ? "border-primary/40 bg-primary/5 hover:bg-primary/10" : "border-glass-border glass-subtle hover:bg-glass"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -428,18 +517,18 @@ function Settings() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">Almacenamiento total</p>
+                      <p className="text-xs text-muted-foreground">{tr("Almacenamiento total", "Total storage")}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-semibold">{plan.price}</p>
-                    <p className="text-xs text-muted-foreground">{plan.period}</p>
+                    <p className="text-xs text-muted-foreground">{per}</p>
                   </div>
                 </button>
               ))}
             </div>
             <p className="mt-3 text-center text-[11px] text-muted-foreground">
-              Cancela cuando quieras. Precios incluyen impuestos aplicables.
+              {tr("Cancela cuando quieras. Precios incluyen impuestos aplicables.", "Cancel anytime. Prices include applicable taxes.")}
             </p>
           </div>
         </div>

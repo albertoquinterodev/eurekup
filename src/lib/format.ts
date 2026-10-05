@@ -6,19 +6,19 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
-export function formatTime(date: string | Date): string {
+export function formatTime(date: string | Date, lang: "es" | "en" = "es"): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Ahora";
+  if (diffMin < 1) return lang === "en" ? "Now" : "Ahora";
   if (diffMin < 60) return `${diffMin}m`;
   const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  if (sameDay) return d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return "Ayer";
-  return d.toLocaleDateString("es", { day: "2-digit", month: "short" });
+  if (d.toDateString() === yesterday.toDateString()) return lang === "en" ? "Yesterday" : "Ayer";
+  return d.toLocaleDateString(lang, { day: "2-digit", month: "short" });
 }
 
 export function initials(name: string): string {
