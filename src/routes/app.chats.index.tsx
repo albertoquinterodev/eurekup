@@ -9,6 +9,7 @@ import { Chip, ChipRow } from "@/components/chip";
 import { Avatar } from "@/components/avatar-bubble";
 import { Fab } from "@/components/fab";
 import { formatTime } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/app/chats/")({
   component: ChatsList,
@@ -30,13 +31,14 @@ interface ChatItem {
 interface ContactPick {
   contact_user_id: string;
   display_name: string;
-  email: string;
+  username: string;
   avatar_url: string | null;
 }
 
 function ChatsList() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { tr, lang } = useT();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(true);
@@ -110,7 +112,7 @@ function ChatsList() {
       for (const m of lastMsgs ?? []) {
         if (!lastByConv.has(m.conversation_id)) {
           lastByConv.set(m.conversation_id, {
-            body: m.deleted_at ? "Mensaje eliminado" : m.body,
+            body: m.deleted_at ? tr("Mensaje eliminado", "Message deleted") : m.body,
             created_at: m.created_at,
           });
         }
@@ -124,10 +126,10 @@ function ChatsList() {
 
       const items: ChatItem[] = (convs ?? []).map((c) => {
         const last = lastByConv.get(c.id);
-        let displayName = "Conversación";
+        let displayName = tr("Conversación", "Conversation");
         let avatarUrl: string | null = null;
         if (c.kind === "channel" && c.channel_id) {
-          displayName = `# ${channelMap.get(c.channel_id) ?? "canal"}`;
+          displayName = `# ${channelMap.get(c.channel_id) ?? tr("canal", "channel")}`;
         } else {
           const peer = peerByConv.get(c.id);
           if (peer) {
@@ -171,17 +173,17 @@ function ChatsList() {
     setPicker(true);
     const { data, error } = await supabase
       .from("contacts")
-      .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, email, avatar_url)")
+      .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url)")
       .eq("owner_id", user.id);
     if (error) {
-      toast.error("No se pudieron cargar contactos");
+      toast.error(tr("No se pudieron cargar contactos", "Could not load contacts"));
       return;
     }
     setContacts(
       (data ?? []).map((d) => ({
         contact_user_id: d.contact_user_id,
         display_name: (d.profiles as { display_name: string }).display_name,
-        email: (d.profiles as { email: string }).email,
+        username: (d.profiles as { username: string }).username,
         avatar_url: (d.profiles as { avatar_url: string | null }).avatar_url,
       }))
     );
@@ -193,16 +195,16 @@ function ChatsList() {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.");
+        toast.error(tr("Tu sesión ha caducado. Vuelve a iniciar sesión.", "Your session has expired. Please sign in again."));
         navigate({ to: "/auth" });
         return;
       }
       const { data: convId, error } = await supabase.rpc("get_or_create_direct_conversation", { _peer: peerId });
-      if (error || !convId) throw new Error(error?.message ?? "Error al crear chat");
+      if (error || !convId) throw new Error(error?.message ?? tr("Error al crear chat", "Error creating chat"));
       setPicker(false);
       navigate({ to: "/app/chats/$id", params: { id: convId as string } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al crear chat");
+      toast.error(e instanceof Error ? e.message : tr("Error al crear chat", "Error creating chat"));
     } finally {
       setBusyContactId(null);
     }
@@ -227,13 +229,13 @@ function ChatsList() {
   return (
     <>
       <AppBar
-        title="Chats"
+        title={tr("Chats", "Chats")}
         subtitle={
           totalUnread > 0
-            ? `${totalUnread} sin leer · ${chats.length} conversaciones`
+            ? tr(`${totalUnread} sin leer · ${chats.length} conversaciones`, `${totalUnread} unread · ${chats.length} conversations`)
             : chats.length
-            ? `${chats.length} conversaciones`
-            : "Sin conversaciones"
+            ? tr(`${chats.length} conversaciones`, `${chats.length} conversations`)
+            : tr("Sin conversaciones", "No conversations")
         }
       />
       <div className="px-3 pt-3">
@@ -242,27 +244,27 @@ function ChatsList() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar en conversaciones…"
+            placeholder={tr("Buscar en conversaciones…", "Search conversations…")}
             className="flex-1 bg-transparent text-sm focus:outline-none"
           />
         </div>
       </div>
       <ChipRow>
-        <Chip active={filter === "all"} onClick={() => setFilter("all")}>Todos</Chip>
-        <Chip active={filter === "personal"} onClick={() => setFilter("personal")}>Personal</Chip>
+        <Chip active={filter === "all"} onClick={() => setFilter("all")}>{tr("Todos", "All")}</Chip>
+        <Chip active={filter === "personal"} onClick={() => setFilter("personal")}>{tr("Personal", "Personal")}</Chip>
         <Chip active={filter === "unread"} onClick={() => setFilter("unread")}>
-          No leídos {totalUnread > 0 && `(${totalUnread})`}
+          {tr("No leídos", "Unread")} {totalUnread > 0 && `(${totalUnread})`}
         </Chip>
       </ChipRow>
 
       <div className="px-3 pb-4">
         {loading ? (
-          <EmptyState icon={Loader2} title="Cargando" description="Un momento…" spinning />
+          <EmptyState icon={Loader2} title={tr("Cargando", "Loading")} description={tr("Un momento…", "One moment…")} spinning />
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={MessageCirclePlus}
-            title="Aún no hay conversaciones"
-            description="Inicia un chat o únete a un canal."
+            title={tr("Aún no hay conversaciones", "No conversations yet")}
+            description={tr("Inicia un chat o únete a un canal.", "Start a chat or join a channel.")}
           />
         ) : (
           <ul className="glass rounded-3xl overflow-hidden">
@@ -283,11 +285,11 @@ function ChatsList() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className={`truncate ${c.unread > 0 ? "font-semibold" : "font-medium"}`}>{c.display_name}</p>
-                      <span className="shrink-0 text-xs text-muted-foreground">{formatTime(c.last_at)}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{formatTime(c.last_at, lang)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <p className={`flex-1 truncate text-sm ${c.unread > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-                        {c.last_body ?? "Aún no hay mensajes"}
+                        {c.last_body ?? tr("Aún no hay mensajes", "No messages yet")}
                       </p>
                       {c.unread > 0 && (
                         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
@@ -304,28 +306,28 @@ function ChatsList() {
         )}
       </div>
 
-      <Fab onClick={openPicker} icon={MessageCirclePlus} label="Nuevo chat" />
+      <Fab onClick={openPicker} icon={MessageCirclePlus} label={tr("Nuevo chat", "New chat")} />
 
       {picker && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
           <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setPicker(false)} />
           <div className="glass-strong relative flex max-h-[80dvh] w-full max-w-md flex-col rounded-3xl p-5 animate-slide-up">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Nuevo chat</h2>
-              <button onClick={() => setPicker(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label="Cerrar">
+              <h2 className="text-lg font-semibold">{tr("Nuevo chat", "New chat")}</h2>
+              <button onClick={() => setPicker(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label={tr("Cerrar", "Close")}>
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Elige un contacto para empezar.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{tr("Elige un contacto para empezar.", "Choose a contact to get started.")}</p>
             <div className="mt-4 -mx-1 flex-1 overflow-y-auto px-1">
               {contacts.length === 0 ? (
                 <div className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">No tienes contactos todavía.</p>
+                  <p className="text-sm text-muted-foreground">{tr("No tienes contactos todavía.", "You don't have any contacts yet.")}</p>
                   <button
                     onClick={() => { setPicker(false); navigate({ to: "/app/contacts" }); }}
                     className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
                   >
-                    <UserPlus className="h-4 w-4" /> Añadir contacto
+                    <UserPlus className="h-4 w-4" /> {tr("Añadir contacto", "Add contact")}
                   </button>
                 </div>
               ) : (
@@ -340,7 +342,7 @@ function ChatsList() {
                         <Avatar name={c.display_name} url={c.avatar_url} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{c.display_name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                          <p className="truncate text-xs text-muted-foreground">@{c.username}</p>
                         </div>
                         {busyContactId === c.contact_user_id && (
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
