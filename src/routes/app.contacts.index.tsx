@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
 import { Avatar } from "@/components/avatar-bubble";
 import { useOnlineSet } from "@/hooks/use-presence";
+import { useT } from "@/lib/i18n";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -18,20 +19,25 @@ export const Route = createFileRoute("/app/contacts/")({
 interface Contact {
   id: string;
   contact_user_id: string;
-  profile: { display_name: string; email: string; avatar_url: string | null };
+  profile: { display_name: string; username: string; avatar_url: string | null };
 }
 
-const emailSchema = z.string().trim().email("Email inválido").max(255);
+const nickSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/^@/, "").toLowerCase())
+  .pipe(z.string().regex(/^[a-z0-9_]{3,24}$/));
 
 function Contacts() {
   const { user } = useAuth();
   const online = useOnlineSet();
+  const { tr } = useT();
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [email, setEmail] = useState("");
+  const [nick, setNick] = useState("");
   const [confirmDel, setConfirmDel] = useState<Contact | null>(null);
 
   useEffect(() => {
@@ -39,17 +45,17 @@ function Contacts() {
     const load = async () => {
       const { data, error } = await supabase
         .from("contacts")
-        .select("id, contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, email, avatar_url)")
+        .select("id, contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url)")
         .eq("owner_id", user.id)
         .order("created_at", { ascending: false });
       if (error) {
-        toast.error("No se pudieron cargar los contactos");
+        toast.error(tr("No se pudieron cargar los contactos", "Couldn't load contacts"));
       } else {
         setContacts(
           (data ?? []).map((d) => ({
             id: d.id,
             contact_user_id: d.contact_user_id,
-            profile: d.profiles as { display_name: string; email: string; avatar_url: string | null },
+            profile: d.profiles as { display_name: string; username: string; avatar_url: string | null },
           }))
         );
       }
@@ -65,41 +71,41 @@ function Contacts() {
     if (!user) return null;
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
-      toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.");
+      toast.error(tr("Tu sesión ha caducado. Vuelve a iniciar sesión.", "Your session expired. Please sign in again."));
       navigate({ to: "/auth" });
       return null;
     }
     const { data, error } = await supabase.rpc("get_or_create_direct_conversation", { _peer: peerId });
     if (error) {
-      toast.error(error.message || "No se pudo abrir el chat");
+      toast.error(error.message || tr("No se pudo abrir el chat", "Couldn't open the chat"));
       return null;
     }
     return data as string;
   };
 
   const addContact = async () => {
-    const parsed = emailSchema.safeParse(email);
+    const parsed = nickSchema.safeParse(nick);
     if (!parsed.success) {
-      toast.error(parsed.error.errors[0].message);
+      toast.error(tr("Nick inválido: 3–24 letras, números o _", "Invalid nick: 3–24 letters, numbers or _"));
       return;
     }
     if (!user) return;
     setAdding(true);
     try {
-      const target = parsed.data.toLowerCase();
+      const target = parsed.data;
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, display_name, email, avatar_url")
-        .ilike("email", target)
+        .select("id, display_name, username, avatar_url")
+        .eq("username", target)
         .limit(1);
       if (pErr) throw pErr;
       const profile = profiles?.[0];
       if (!profile) {
-        toast.error("No existe un usuario con ese email");
+        toast.error(tr("No existe ningún usuario con ese nick", "No user with that nick"));
         return;
       }
       if (profile.id === user.id) {
-        toast.error("No puedes añadirte a ti mismo");
+        toast.error(tr("No puedes añadirte a ti mismo", "You can't add yourself"));
         return;
       }
       const { data: existing } = await supabase
@@ -109,11 +115,11 @@ function Contacts() {
         .eq("contact_user_id", profile.id)
         .maybeSingle();
       if (existing) {
-        toast.message("Ya tienes este contacto");
+        toast.message(tr("Ya tienes este contacto", "Already in your contacts"));
         // still ensure a conversation and navigate
         const convId = await ensureDirectConv(profile.id);
         setShowAdd(false);
-        setEmail("");
+        setNick("");
         if (convId) navigate({ to: "/app/chats/$id", params: { id: convId } });
         return;
       }
@@ -127,18 +133,18 @@ function Contacts() {
         {
           id: inserted.id,
           contact_user_id: inserted.contact_user_id,
-          profile: { display_name: profile.display_name, email: profile.email, avatar_url: profile.avatar_url },
+          profile: { display_name: profile.display_name, username: profile.username, avatar_url: profile.avatar_url },
         },
         ...prev,
       ]);
       // Auto-create chat instance and jump into it.
       const convId = await ensureDirectConv(profile.id);
-      toast.success(`${profile.display_name} añadido`);
+      toast.success(`${profile.display_name} ${tr("añadido", "added")}`);
       setShowAdd(false);
-      setEmail("");
+      setNick("");
       if (convId) navigate({ to: "/app/chats/$id", params: { id: convId } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al añadir");
+      toast.error(e instanceof Error ? e.message : tr("Error al añadir", "Couldn't add"));
     } finally {
       setAdding(false);
     }
@@ -147,11 +153,11 @@ function Contacts() {
   const remove = async (c: Contact) => {
     const { error } = await supabase.from("contacts").delete().eq("id", c.id);
     if (error) {
-      toast.error("No se pudo eliminar");
+      toast.error(tr("No se pudo eliminar", "Couldn't delete"));
       return;
     }
     setContacts((prev) => prev.filter((x) => x.id !== c.id));
-    toast.success("Contacto eliminado");
+    toast.success(tr("Contacto eliminado", "Contact deleted"));
   };
 
   const startChat = async (c: Contact) => {
@@ -161,7 +167,7 @@ function Contacts() {
 
   return (
     <>
-      <AppBar title="Contactos" subtitle={`${contacts.length} ${contacts.length === 1 ? "contacto" : "contactos"}`} />
+      <AppBar title={tr("Contactos", "Contacts")} subtitle={`${contacts.length} ${contacts.length === 1 ? tr("contacto", "contact") : tr("contactos", "contacts")}`} />
       <div className="px-3 pb-4 pt-3">
         {loading ? (
           <div className="glass flex items-center justify-center rounded-3xl py-16">
@@ -172,8 +178,8 @@ function Contacts() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-glass-strong">
               <UserPlus className="h-5 w-5" />
             </div>
-            <p className="mt-3 font-medium">Sin contactos</p>
-            <p className="mt-1 text-sm text-muted-foreground">Añade tu primer contacto por email.</p>
+            <p className="mt-3 font-medium">{tr("Sin contactos", "No contacts")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{tr("Añade tu primer contacto por su nick.", "Add your first contact by nick.")}</p>
           </div>
         ) : (
           <ul className="glass rounded-3xl overflow-hidden">
@@ -183,34 +189,34 @@ function Contacts() {
                   <button
                     onClick={() => startChat(c)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    aria-label={`Abrir chat con ${c.profile.display_name}`}
+                    aria-label={`${tr("Abrir chat con", "Open chat with")} ${c.profile.display_name}`}
                   >
                     <Avatar name={c.profile.display_name} url={c.profile.avatar_url} online={online.has(c.contact_user_id)} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{c.profile.display_name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{c.profile.email}</p>
+                      <p className="truncate text-xs text-muted-foreground">@{c.profile.username}</p>
                     </div>
                   </button>
                   <button
                     onClick={() => startChat(c)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
-                    aria-label="Nuevo chat"
-                    title="Nuevo chat"
+                    aria-label={tr("Nuevo chat", "New chat")}
+                    title={tr("Nuevo chat", "New chat")}
                   >
                     <MessageSquare className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => navigate({ to: "/app/channels" })}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-glass"
-                    aria-label="Nuevo canal"
-                    title="Crear o unirse a un canal"
+                    aria-label={tr("Nuevo canal", "New channel")}
+                    title={tr("Crear o unirse a un canal", "Create or join a channel")}
                   >
                     <Hash className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDel(c)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
-                    aria-label="Eliminar"
+                    aria-label={tr("Eliminar", "Delete")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -227,15 +233,15 @@ function Contacts() {
         <button
           onClick={() => navigate({ to: "/app/channels" })}
           className="flex h-12 w-12 items-center justify-center rounded-full glass-strong text-foreground shadow-elevated transition-all duration-200 hover:scale-105 active:scale-95 backdrop-blur-2xl"
-          aria-label="Crear canal"
-          title="Crear o explorar canal"
+          aria-label={tr("Crear canal", "Create channel")}
+          title={tr("Crear o explorar canal", "Create or explore channels")}
         >
           <Hash className="h-5 w-5" />
         </button>
         <button
           onClick={() => setShowAdd(true)}
           className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label="Añadir contacto"
+          aria-label={tr("Añadir contacto", "Add contact")}
         >
           <UserPlus className="h-6 w-6" strokeWidth={2.5} />
         </button>
@@ -246,14 +252,16 @@ function Contacts() {
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
           <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowAdd(false)} />
           <div className="glass-strong relative w-full max-w-sm rounded-3xl p-6 animate-slide-up">
-            <h2 className="text-lg font-semibold">Añadir contacto</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Introduce el email del usuario.</p>
+            <h2 className="text-lg font-semibold">{tr("Añadir contacto", "Add contact")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{tr("Escribe el nick del usuario. Por privacidad no se usan correos ni teléfonos.", "Enter the user's nick. For privacy, emails and phone numbers aren't used.")}</p>
             <input
-              type="email"
+              type="text"
               autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@email.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={nick}
+              onChange={(e) => setNick(e.target.value.slice(0, 25))}
+              placeholder="@nick"
               className="mt-4 w-full rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               onKeyDown={(e) => e.key === "Enter" && addContact()}
             />
@@ -262,7 +270,7 @@ function Contacts() {
                 onClick={() => setShowAdd(false)}
                 className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium"
               >
-                Cancelar
+                {tr("Cancelar", "Cancel")}
               </button>
               <button
                 onClick={addContact}
@@ -270,7 +278,7 @@ function Contacts() {
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {adding && <Loader2 className="h-4 w-4 animate-spin" />}
-                Añadir
+                {tr("Añadir", "Add")}
               </button>
             </div>
           </div>
@@ -280,13 +288,13 @@ function Contacts() {
       <ConfirmDialog
         open={!!confirmDel}
         onOpenChange={(o) => !o && setConfirmDel(null)}
-        title="Eliminar contacto"
+        title={tr("Eliminar contacto", "Delete contact")}
         description={
           <>
-            ¿Eliminar a <span className="text-foreground font-medium">{confirmDel?.profile.display_name}</span>? No se eliminarán las conversaciones existentes.
+            {tr("¿Eliminar a", "Delete")} <span className="text-foreground font-medium">{confirmDel?.profile.display_name}</span>? {tr("No se eliminarán las conversaciones existentes.", "Existing conversations won't be deleted.")}
           </>
         }
-        confirmLabel="Eliminar"
+        confirmLabel={tr("Eliminar", "Delete")}
         destructive
         onConfirm={async () => { if (confirmDel) await remove(confirmDel); }}
       />
