@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { EurekupLogo } from "@/components/eurekup-logo";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { useTheme } from "@/hooks/use-theme";
+import { useT } from "@/lib/i18n";
 
 interface AppBarProps {
   title: string;
@@ -19,6 +20,7 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const { tr } = useT();
 
   useEffect(() => {
     if (!open) return;
@@ -44,7 +46,7 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
             <button
               onClick={onSearch}
               className="flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-glass-strong hover:text-foreground"
-              aria-label="Buscar"
+              aria-label={tr("Buscar", "Search")}
             >
               <Search className="h-5 w-5" />
             </button>
@@ -56,7 +58,7 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
               <button
                 onClick={() => setOpen((v) => !v)}
                 className="flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-glass-strong hover:text-foreground"
-                aria-label="Menú"
+                aria-label={tr("Menú", "Menu")}
                 aria-expanded={open}
               >
                 <MoreVertical className="h-5 w-5" />
@@ -65,27 +67,27 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
                 <div className="glass-strong absolute right-0 top-12 z-40 w-56 overflow-hidden rounded-2xl p-1 animate-slide-up">
                   <MenuItem
                     icon={theme === "dark" ? Sun : Moon}
-                    label={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+                    label={theme === "dark" ? tr("Modo claro", "Light mode") : tr("Modo oscuro", "Dark mode")}
                     onClick={() => { toggle(); setOpen(false); }}
                   />
                   <MenuItem
                     icon={Hash}
-                    label="Nuevo canal"
+                    label={tr("Nuevo canal", "New channel")}
                     onClick={() => { setOpen(false); navigate({ to: "/app/channels" }); }}
                   />
                   <MenuItem
                     icon={Bookmark}
-                    label="Mensajes guardados"
+                    label={tr("Mensajes guardados", "Saved messages")}
                     onClick={() => { setOpen(false); navigate({ to: "/app/chats" }); }}
                   />
                   <MenuItem
                     icon={UserPen}
-                    label="Editar perfil"
+                    label={tr("Editar perfil", "Edit profile")}
                     onClick={() => { setOpen(false); navigate({ to: "/app/settings" }); }}
                   />
                   <MenuItem
                     icon={SettingsIcon}
-                    label="Ajustes"
+                    label={tr("Ajustes", "Settings")}
                     onClick={() => { setOpen(false); navigate({ to: "/app/settings" }); }}
                   />
                 </div>

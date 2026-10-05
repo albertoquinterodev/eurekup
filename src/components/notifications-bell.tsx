@@ -4,6 +4,7 @@ import { Bell, Check, Trash2, Inbox } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatTime } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 
 interface Notification {
   id: string;
@@ -17,6 +18,7 @@ interface Notification {
 
 export function NotificationsBell() {
   const { user } = useAuth();
+  const { tr, lang } = useT();
   const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -81,7 +83,7 @@ export function NotificationsBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-glass-strong hover:text-foreground"
-        aria-label="Notificaciones"
+        aria-label={tr("Notificaciones", "Notifications")}
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
@@ -93,13 +95,13 @@ export function NotificationsBell() {
       {open && (
         <div className="glass-strong absolute right-0 top-12 z-50 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl animate-slide-up">
           <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
-            <p className="text-sm font-semibold">Notificaciones</p>
+            <p className="text-sm font-semibold">{tr("Notificaciones", "Notifications")}</p>
             {unread > 0 && (
               <button
                 onClick={markAllRead}
                 className="flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:bg-glass hover:text-foreground"
               >
-                <Check className="h-3.5 w-3.5" /> Marcar todas
+                <Check className="h-3.5 w-3.5" /> {tr("Marcar todas", "Mark all")}
               </button>
             )}
           </div>
@@ -107,7 +109,7 @@ export function NotificationsBell() {
             {items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
                 <Inbox className="h-6 w-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Sin notificaciones</p>
+                <p className="text-sm text-muted-foreground">{tr("Sin notificaciones", "No notifications")}</p>
               </div>
             ) : (
               <ul>
@@ -128,14 +130,14 @@ export function NotificationsBell() {
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-foreground">{n.title}</p>
                               {n.body && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>}
-                              <p className="mt-1 text-[10px] text-muted-foreground">{formatTime(n.created_at)}</p>
+                              <p className="mt-1 text-[10px] text-muted-foreground">{formatTime(n.created_at, lang)}</p>
                             </div>
                           </div>
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); remove(n.id); }}
                           className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex"
-                          aria-label="Eliminar"
+                          aria-label={tr("Eliminar", "Delete")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

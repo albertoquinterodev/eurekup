@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AppBar } from "@/components/app-bar";
 import { Fab } from "@/components/fab";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/app/channels/")({
   component: Channels,
@@ -20,11 +21,13 @@ interface Channel {
   tags: string[];
 }
 
-const TAGS = ["Tecnología", "Diseño", "Música", "Cine", "Negocios", "Estudio"];
+const TAGS_ES = ["Tecnología", "Diseño", "Música", "Cine", "Negocios", "Estudio"];
+const TAGS_EN = ["Technology", "Design", "Music", "Film", "Business", "Study"];
 
 function Channels() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { tr, lang } = useT();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -63,7 +66,7 @@ function Channels() {
         toast.error(error.message);
         return;
       }
-      toast.success("Solicitud enviada");
+      toast.success(tr("Solicitud enviada", "Request sent"));
       return;
     }
     // create conversation tied to channel if missing
@@ -84,7 +87,7 @@ function Channels() {
 
   const create = async () => {
     if (!user || !newName.trim()) {
-      toast.error("Nombre requerido");
+      toast.error(tr("Nombre requerido", "Name required"));
       return;
     }
     setCreating(true);
@@ -107,9 +110,9 @@ function Channels() {
       setShowCreate(false);
       setNewName("");
       setNewDesc("");
-      toast.success("Canal creado");
+      toast.success(tr("Canal creado", "Channel created"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
+      toast.error(e instanceof Error ? e.message : tr("Error", "Error"));
     } finally {
       setCreating(false);
     }
@@ -118,13 +121,13 @@ function Channels() {
   return (
     <>
       <AppBar
-        title="Canales"
-        subtitle="Descubre comunidades"
+        title={tr("Canales", "Channels")}
+        subtitle={tr("Descubre comunidades", "Discover communities")}
         rightSlot={
           <button
             onClick={() => setShowFilters((s) => !s)}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-glass-strong"
-            aria-label="Filtros"
+            aria-label={tr("Filtros", "Filters")}
           >
             <SlidersHorizontal className="h-5 w-5" />
           </button>
@@ -137,16 +140,16 @@ function Channels() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar canales…"
+            placeholder={tr("Buscar canales…", "Search channels…")}
             className="flex-1 bg-transparent text-sm focus:outline-none"
           />
         </div>
 
         {showFilters && (
           <div className="glass mt-3 rounded-3xl p-4 animate-slide-up">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Preferencias</p>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">{tr("Preferencias", "Preferences")}</p>
             <div className="flex flex-wrap gap-2">
-              {TAGS.map((t) => {
+              {(lang === "en" ? TAGS_EN : TAGS_ES).map((t) => {
                 const active = activeTags.includes(t);
                 return (
                   <button
@@ -174,8 +177,8 @@ function Channels() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="glass rounded-3xl px-6 py-12 text-center">
-            <p className="font-medium">Sin resultados</p>
-            <p className="mt-1 text-sm text-muted-foreground">Crea el primer canal con el botón +.</p>
+            <p className="font-medium">{tr("Sin resultados", "No results")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{tr("Crea el primer canal con el botón +.", "Create the first channel with the + button.")}</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -190,7 +193,7 @@ function Channels() {
                       <p className="truncate font-medium">{c.name}</p>
                       <span className="flex items-center gap-1 rounded-full glass-subtle px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                         {c.visibility === "public" ? <Globe className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
-                        {c.visibility === "public" ? "Público" : "Privado"}
+                        {c.visibility === "public" ? tr("Público", "Public") : tr("Privado", "Private")}
                       </span>
                     </div>
                     {c.description && <p className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{c.description}</p>}
@@ -199,7 +202,7 @@ function Channels() {
                     onClick={() => join(c)}
                     className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
                   >
-                    {c.visibility === "private" && c.owner_id !== user?.id ? "Solicitar" : "Unirse"}
+                    {c.visibility === "private" && c.owner_id !== user?.id ? tr("Solicitar", "Request") : tr("Unirse", "Join")}
                   </button>
                 </div>
               </li>
@@ -208,23 +211,23 @@ function Channels() {
         )}
       </div>
 
-      <Fab onClick={() => setShowCreate(true)} icon={Plus} label="Crear canal" />
+      <Fab onClick={() => setShowCreate(true)} icon={Plus} label={tr("Crear canal", "Create channel")} />
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
           <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
           <div className="glass-strong relative w-full max-w-md rounded-3xl p-6 animate-slide-up">
-            <h2 className="text-lg font-semibold">Crear canal</h2>
+            <h2 className="text-lg font-semibold">{tr("Crear canal", "Create channel")}</h2>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nombre del canal"
+              placeholder={tr("Nombre del canal", "Channel name")}
               className="mt-4 w-full rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <textarea
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
-              placeholder="Descripción (opcional)"
+              placeholder={tr("Descripción (opcional)", "Description (optional)")}
               rows={3}
               className="mt-2 w-full resize-none rounded-2xl glass-subtle px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -238,13 +241,13 @@ function Channels() {
                   }`}
                 >
                   {v === "public" ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                  {v === "public" ? "Público" : "Privado"}
+                  {v === "public" ? tr("Público", "Public") : tr("Privado", "Private")}
                 </button>
               ))}
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={() => setShowCreate(false)} className="flex-1 rounded-full glass-subtle py-2.5 text-sm font-medium">
-                Cancelar
+                {tr("Cancelar", "Cancel")}
               </button>
               <button
                 onClick={create}
@@ -252,7 +255,7 @@ function Channels() {
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-                Crear
+                {tr("Crear", "Create")}
               </button>
             </div>
           </div>
