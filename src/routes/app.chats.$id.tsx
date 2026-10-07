@@ -68,6 +68,19 @@ function fileIconFor(mime: string | null) {
   return FileIcon;
 }
 
+/** Fixed position for the message menu: below the bubble, or above when near the bottom. */
+function menuPosition(rect: DOMRect | null, mine: boolean): React.CSSProperties {
+  if (!rect || typeof window === "undefined") return { top: "50%", left: "50%", transform: "translate(-50%,-50%)" };
+  const menuH = 260;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const below = rect.bottom + 6 + menuH < vh - 90;
+  const style: React.CSSProperties = below ? { top: rect.bottom + 6 } : { bottom: Math.max(8, vh - rect.top + 6) };
+  if (mine) style.right = Math.max(8, vw - rect.right);
+  else style.left = Math.max(8, rect.left);
+  return style;
+}
+
 function ChatRoom() {
   const { id } = Route.useParams();
   const { user } = useAuth();
@@ -272,6 +285,47 @@ function ChatRoom() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
+
+  useEffect(() => {
+    if (!user) return;
+    setHasIncoming(messages.some((m) => m.sender_id !== user.id));
+  }, [messages, user]);
+
+  useEffect(() => {
+    if (!openMenuFor) return;
+    const el = scrollRef.current;
+    const close = () => setOpenMenuFor(null);
+    el?.addEventListener("scroll", close, { passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      el?.removeEventListener("scroll", close);
+      window.removeEventListener("resize", close);
+    };
+  }, [openMenuFor]);
+
+  const allowPeer = async () => {
+    if (!user || !peerId) return;
+    const { error } = await supabase.from("contacts").insert({ owner_id: user.id, contact_user_id: peerId });
+    if (error && !error.message.includes("duplicate")) return toast.error(error.message);
+    setIsContact(true);
+    toast.success(tr("Contacto añadido.", "Contact added."));
+  };
+
+  const blockPeer = async () => {
+    if (!user || !peerId) return;
+    const { error } = await supabase.from("user_blocks").insert({ blocker_id: user.id, blocked_id: peerId });
+    if (error && !error.message.includes("duplicate")) return toast.error(error.message);
+    setIBlocked(true);
+    toast.success(tr("Contacto bloqueado.", "Contact blocked."));
+  };
+
+  const unblockPeer = async () => {
+    if (!user || !peerId) return;
+    const { error } = await supabase.from("user_blocks").delete().eq("blocker_id", user.id).eq("blocked_id", peerId);
+    if (error) return toast.error(error.message);
+    setIBlocked(false);
+    toast.success(tr("Contacto desbloqueado.", "Contact unblocked."));
+  };
 
   const send = async (scheduledAt?: Date) => {
     if (!text.trim() || !user) return;
