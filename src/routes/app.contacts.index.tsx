@@ -45,7 +45,7 @@ function Contacts() {
     const load = async () => {
       const { data, error } = await supabase
         .from("contacts")
-        .select("id, contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url)")
+        .select("id, contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url:visible_avatar)")
         .eq("owner_id", user.id)
         .order("created_at", { ascending: false });
       if (error) {
@@ -95,7 +95,7 @@ function Contacts() {
       const target = parsed.data;
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, display_name, username, avatar_url")
+        .select("id, display_name, username, avatar_url:visible_avatar")
         .eq("username", target)
         .limit(1);
       if (pErr) throw pErr;

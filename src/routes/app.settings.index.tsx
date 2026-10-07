@@ -55,7 +55,7 @@ function Settings() {
     if (!user) return;
     const load = async () => {
       const [{ data: p }, { data: q }, { data: refs }] = await Promise.all([
-        supabase.from("profiles").select("display_name, username, avatar_url, referral_code").eq("id", user.id).single(),
+        supabase.from("profiles").select("display_name, username, avatar_url:visible_avatar, avatar_visibility, referral_code").eq("id", user.id).single(),
         supabase.from("storage_quota").select("used_bytes, total_bytes").eq("user_id", user.id).single(),
         supabase.from("referrals").select("status").eq("referrer_id", user.id),
       ]);
