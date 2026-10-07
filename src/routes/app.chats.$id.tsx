@@ -916,7 +916,7 @@ function ChatRoom() {
         )}
         confirmLabel={tr("Bloquear", "Block")}
         destructive
-        onConfirm={blockPeer}
+        onConfirm={async () => { await blockPeer(); }}
       />
 
       {lightbox && (
