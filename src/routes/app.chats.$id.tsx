@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { playMessageBeep } from "@/lib/sound";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ShieldBan, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -78,7 +82,16 @@ function ChatRoom() {
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { t, lang } = useT();
+  const { t, lang, tr } = useT();
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null);
+  const [isContact, setIsContact] = useState<boolean | null>(null);
+  const [iBlocked, setIBlocked] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [hasIncoming, setHasIncoming] = useState(false);
+  const openMenu = (id: string, el: HTMLElement | null) => {
+    setMenuRect(el ? el.getBoundingClientRect() : null);
+    setOpenMenuFor(id);
+  };
   const [peerId, setPeerId] = useState<string | null>(null);
   const [lastSeen, setLastSeen] = useState<string | null>(null);
   const peerOnline = useIsOnline(peerId);
@@ -141,6 +154,12 @@ function ChatRoom() {
             setTitle(prof.display_name);
             setAvatar(prof.avatar_url);
             setPeerId(peerId);
+            const [{ data: c }, { data: b }] = await Promise.all([
+              supabase.from("contacts").select("id").eq("owner_id", user.id).eq("contact_user_id", peerId).maybeSingle(),
+              supabase.from("user_blocks").select("id").eq("blocker_id", user.id).eq("blocked_id", peerId).maybeSingle(),
+            ]);
+            setIsContact(!!c);
+            setIBlocked(!!b);
             setLastSeen(prof.last_seen_at);
           }
         }
@@ -187,6 +206,7 @@ function ChatRoom() {
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${id}` },
         async (payload) => {
           const m = payload.new as Message;
+          if (m.sender_id !== user.id) playMessageBeep();
           const [hydrated] = await hydrateFiles([m]);
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, hydrated]));
           requestAnimationFrame(() => {
@@ -586,7 +606,8 @@ function ChatRoom() {
                   <div
                     className="relative max-w-[78%]"
                     onTouchStart={(e) => {
-                      const t = window.setTimeout(() => setOpenMenuFor(m.id), 450);
+                      const el = e.currentTarget as HTMLElement;
+                      const t = window.setTimeout(() => openMenu(m.id, el), 450);
                       (e.currentTarget as HTMLDivElement & { _lp?: number })._lp = t;
                     }}
                     onTouchEnd={(e) => {
@@ -609,7 +630,7 @@ function ChatRoom() {
                         <p>{t("chat.deleted")}</p>
                       ) : m.file && m.file.mime_type?.startsWith("image/") && thumbs[m.file.id] ? (
                         <button onClick={() => setLightbox(thumbs[m.file!.id])} className="-mx-2 -mt-1 block overflow-hidden rounded-xl">
-                          <img src={thumbs[m.file.id]} alt={m.file.name} loading="lazy" className="max-h-64 w-full max-w-xs object-cover" />
+                          <img src={thumbs[m.file.id]} alt={m.file.name} loading="lazy" className="block h-auto max-h-[350px] w-auto max-w-[min(18rem,100%)] rounded-lg object-contain sm:max-w-sm" />
                         </button>
                       ) : m.file ? (
                         <button
@@ -658,7 +679,7 @@ function ChatRoom() {
                     {/* Action button — only visible on hover (desktop). Mobile uses long-press on the bubble. */}
                     {!isDeleted && (
                       <button
-                        onClick={() => setOpenMenuFor(openMenuFor === m.id ? null : m.id)}
+                        onClick={(e) => (openMenuFor === m.id ? setOpenMenuFor(null) : openMenu(m.id, e.currentTarget.parentElement))}
                         className={`absolute -top-2 ${mine ? "-left-2" : "-right-2"} hidden h-7 w-7 items-center justify-center rounded-full bg-glass-strong text-foreground shadow-soft transition-opacity duration-200 hover:bg-glass md:flex md:opacity-0 md:group-hover:opacity-100 ${openMenuFor === m.id ? "md:opacity-100" : ""}`}
                         aria-label="Acciones"
                       >
@@ -667,11 +688,13 @@ function ChatRoom() {
                     )}
 
                     {/* Action menu */}
-                    {openMenuFor === m.id && !isDeleted && (
+                    {openMenuFor === m.id && !isDeleted && typeof document !== "undefined" && createPortal(
+                      <>
+                      <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)} />
                       <div
-                        className={`absolute z-20 mt-1 min-w-52 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up ${
-                          mine ? "right-0" : "left-0"
-                        } ${i >= messages.length - 3 ? "bottom-full mb-1" : "top-full"}`}
+                        role="menu"
+                        style={menuPosition(menuRect, mine)}
+                        className="fixed z-[80] min-w-52 overflow-hidden rounded-2xl glass-strong p-1 text-sm shadow-elevated animate-slide-up"
                       >
                         {!m.file && (
                           <button
@@ -726,6 +749,8 @@ function ChatRoom() {
                           </button>
                         )}
                       </div>
+                      </>,
+                      document.body
                     )}
                   </div>
                 </li>
@@ -737,6 +762,29 @@ function ChatRoom() {
 
       {/* Composer */}
       <div className="shrink-0 safe-bottom px-3 pb-3 pt-2">
+        {peerId && isContact === false && !iBlocked && hasIncoming && (
+          <div className="glass mx-auto mb-2 flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl px-4 py-3 text-sm animate-slide-up">
+            <p className="min-w-0 flex-1 text-muted-foreground">
+              {tr("Esta persona no está en tus contactos.", "This person isn't in your contacts.")}
+            </p>
+            <button onClick={allowPeer} className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              <UserCheck className="h-3.5 w-3.5" /> {tr("Permitir", "Allow")}
+            </button>
+            <button onClick={() => setConfirmBlock(true)} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10">
+              <ShieldBan className="h-3.5 w-3.5" /> {tr("Bloquear", "Block")}
+            </button>
+          </div>
+        )}
+        {iBlocked && (
+          <div className="glass mx-auto flex max-w-2xl items-center gap-3 rounded-2xl px-4 py-3 text-sm">
+            <ShieldBan className="h-4 w-4 text-destructive" />
+            <p className="flex-1 text-muted-foreground">{tr("Has bloqueado a este contacto.", "You blocked this contact.")}</p>
+            <button onClick={unblockPeer} className="rounded-full glass-subtle px-3 py-1.5 text-xs font-semibold">
+              {tr("Desbloquear", "Unblock")}
+            </button>
+          </div>
+        )}
+        {!iBlocked && (<>
         {editing && (
           <div className="glass mx-auto mb-2 flex max-w-2xl items-center gap-2 rounded-2xl px-3 py-2 text-xs">
             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -802,6 +850,19 @@ function ChatRoom() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onOpenChange={setConfirmBlock}
+        title={tr("Bloquear contacto", "Block contact")}
+        description={tr(
+          "¿Estás seguro de que deseas bloquear a este contacto? No podrá enviarte más mensajes ni ver tu estado.",
+          "Are you sure you want to block this contact? They won't be able to message you or see your status."
+        )}
+        confirmLabel={tr("Bloquear", "Block")}
+        destructive
+        onConfirm={blockPeer}
+      />
 
       {lightbox && (
         <div
