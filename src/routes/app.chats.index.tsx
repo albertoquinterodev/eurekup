@@ -90,7 +90,7 @@ function ChatsList() {
         if (peerIds.length) {
           const { data: profs } = await supabase
             .from("profiles")
-            .select("id, display_name, avatar_url:visible_avatar")
+            .select("id, display_name, avatar_url:visible_avatar" as "id, display_name, avatar_url")
             .in("id", peerIds);
           for (const p of profs ?? []) profileById.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url });
         }
@@ -173,7 +173,7 @@ function ChatsList() {
     setPicker(true);
     const { data, error } = await supabase
       .from("contacts")
-      .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url:visible_avatar)")
+      .select("contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url:visible_avatar)" as "contact_user_id, profiles!contacts_contact_user_id_fkey(display_name, username, avatar_url)")
       .eq("owner_id", user.id);
     if (error) {
       toast.error(tr("No se pudieron cargar contactos", "Could not load contacts"));

@@ -134,7 +134,7 @@ function ChatRoom() {
         if (peerId) {
           const { data: prof } = await supabase
             .from("profiles")
-            .select("display_name, avatar_url:visible_avatar, last_seen_at")
+            .select("display_name, avatar_url:visible_avatar, last_seen_at" as "display_name, avatar_url, last_seen_at")
             .eq("id", peerId)
             .single();
           if (prof) {
