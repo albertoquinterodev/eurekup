@@ -41,7 +41,12 @@ export function NotificationsBell() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => load()
+        (payload) => {
+          if (payload.eventType === "INSERT" && (payload.new as { kind?: string }).kind === "message") {
+            playMessageBeep();
+          }
+          load();
+        }
       )
       .subscribe();
     return () => {
