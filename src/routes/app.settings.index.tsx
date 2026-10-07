@@ -11,6 +11,9 @@ import { AppBar } from "@/components/app-bar";
 import { Avatar } from "@/components/avatar-bubble";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatBytes } from "@/lib/format";
+import { uploadAvatar } from "@/lib/avatar-upload";
+import { isMessageSoundOn, setMessageSound, playMessageBeep } from "@/lib/sound";
+import { Bell, Camera } from "lucide-react";
 
 export const Route = createFileRoute("/app/settings/")({
   component: Settings,
@@ -20,6 +23,7 @@ interface Profile {
   display_name: string;
   username: string;
   avatar_url: string | null;
+  avatar_visibility: string;
   referral_code: string;
 }
 
@@ -44,6 +48,17 @@ function Settings() {
   const [editName, setEditName] = useState("");
   const [editNick, setEditNick] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editVis, setEditVis] = useState<"everyone" | "contacts">("everyone");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreview, setEditPreview] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
+  useEffect(() => setSoundOn(isMessageSoundOn()), []);
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setMessageSound(next);
+    if (next) playMessageBeep(true);
+  };
 
   const setLanguage = (code: string) => {
     if (code !== "es" && code !== "en") return;
@@ -55,7 +70,7 @@ function Settings() {
     if (!user) return;
     const load = async () => {
       const [{ data: p }, { data: q }, { data: refs }] = await Promise.all([
-        supabase.from("profiles").select("display_name, username, avatar_url, referral_code").eq("id", user.id).single(),
+        supabase.from("profiles").select("display_name, username, avatar_url:visible_avatar, avatar_visibility, referral_code" as "display_name, username, avatar_url, avatar_visibility, referral_code").eq("id", user.id).single(),
         supabase.from("storage_quota").select("used_bytes, total_bytes").eq("user_id", user.id).single(),
         supabase.from("referrals").select("status").eq("referrer_id", user.id),
       ]);
@@ -75,6 +90,9 @@ function Settings() {
     if (!profile) return;
     setEditName(profile.display_name);
     setEditNick(profile.username);
+    setEditVis(profile.avatar_visibility === "contacts" ? "contacts" : "everyone");
+    setEditFile(null);
+    setEditPreview(null);
     setEditOpen(true);
   };
 
@@ -87,14 +105,22 @@ function Settings() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: n.data, username: k.data, updated_at: new Date().toISOString() })
+      .update({ display_name: n.data, username: k.data, avatar_visibility: editVis, updated_at: new Date().toISOString() })
       .eq("id", user.id);
     setSaving(false);
     if (error) {
       if (error.code === "23505") return toast.error(tr("Ese nick ya está en uso.", "That nick is already taken."));
       return toast.error(error.message);
     }
-    setProfile({ ...profile, display_name: n.data, username: k.data });
+    let avatarUrl = profile.avatar_url;
+    if (editFile) {
+      try {
+        avatarUrl = await uploadAvatar(user.id, editFile);
+      } catch {
+        toast.error(tr("No se pudo subir la foto (imagen de máx. 5 MB).", "Couldn't upload the photo (image up to 5 MB)."));
+      }
+    }
+    setProfile({ ...profile, display_name: n.data, username: k.data, avatar_visibility: editVis, avatar_url: avatarUrl });
     setEditOpen(false);
     toast.success(tr("Perfil actualizado.", "Profile updated."));
   };
@@ -328,6 +354,21 @@ function Settings() {
           </div>
           <div className="ml-12 h-px bg-glass-border" />
 
+          <div className="flex w-full items-center gap-3 px-5 py-4">
+            <Bell className="h-5 w-5 text-muted-foreground" />
+            <span className="flex-1 text-sm">{tr("Sonido de mensajes", "Message sound")}</span>
+            <button
+              onClick={toggleSound}
+              role="switch"
+              aria-checked={soundOn}
+              aria-label={tr("Sonido de mensajes", "Message sound")}
+              className={`relative h-7 w-12 rounded-full transition-colors duration-200 ${soundOn ? "bg-primary" : "bg-glass-strong"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-background shadow-soft transition-all duration-200 ${soundOn ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+          <div className="ml-12 h-px bg-glass-border" />
+
           <div className="px-5 py-4">
             <div className="flex items-center gap-3">
               <Globe className="h-5 w-5 text-muted-foreground" />
@@ -429,6 +470,44 @@ function Settings() {
               <button onClick={() => setEditOpen(false)} className="rounded-full p-1.5 hover:bg-glass" aria-label={t("common.close")}>
                 <X className="h-4 w-4" />
               </button>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="relative cursor-pointer" aria-label={tr("Cambiar foto", "Change photo")}>
+                <Avatar name={editName || "?"} url={editPreview ?? profile?.avatar_url} size="lg" />
+                <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft">
+                  <Camera className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (!f.type.startsWith("image/") || f.size > 5 * 1024 * 1024) {
+                      toast.error(tr("Elige una imagen de máx. 5 MB.", "Pick an image up to 5 MB."));
+                      return;
+                    }
+                    setEditFile(f);
+                    setEditPreview(URL.createObjectURL(f));
+                  }}
+                />
+              </label>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground">{tr("¿Quién ve tu foto?", "Who can see your photo?")}</p>
+                <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-full glass-subtle p-1">
+                  {(["everyone", "contacts"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setEditVis(v)}
+                      className={`rounded-full px-2 py-1.5 text-xs transition ${editVis === v ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-glass"}`}
+                    >
+                      {v === "everyone" ? tr("Todos", "Everyone") : tr("Mis contactos", "My contacts")}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{tr("Nombre", "Name")}</span>

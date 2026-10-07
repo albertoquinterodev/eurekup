@@ -352,6 +352,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          avatar_visibility: string
           created_at: string
           display_name: string
           email: string
@@ -364,6 +365,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          avatar_visibility?: string
           created_at?: string
           display_name: string
           email: string
@@ -376,6 +378,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          avatar_visibility?: string
           created_at?: string
           display_name?: string
           email?: string
@@ -447,6 +450,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -455,6 +479,10 @@ export type Database = {
       get_or_create_direct_conversation: {
         Args: { _peer: string }
         Returns: string
+      }
+      is_blocked_in_conversation: {
+        Args: { _conv: string; _sender: string }
+        Returns: boolean
       }
       is_channel_member: {
         Args: { _channel: string; _user: string }
@@ -467,6 +495,11 @@ export type Database = {
       is_conversation_member: {
         Args: { _conv: string; _user: string }
         Returns: boolean
+      }
+      username_available: { Args: { _u: string }; Returns: boolean }
+      visible_avatar: {
+        Args: { p: Database["public"]["Tables"]["profiles"]["Row"] }
+        Returns: string
       }
     }
     Enums: {
