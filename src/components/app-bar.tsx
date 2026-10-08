@@ -1,10 +1,11 @@
-import { Search, MoreVertical, Bookmark, UserPen, Settings as SettingsIcon, Sun, Moon, Hash } from "lucide-react";
+import { Search, MoreVertical, Bookmark, UserPen, Settings as SettingsIcon, Sun, Moon, Hash, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { EurekupLogo } from "@/components/eurekup-logo";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { useTheme } from "@/hooks/use-theme";
 import { useT } from "@/lib/i18n";
+import { AiSearchDialog } from "@/components/ai-search-dialog";
 
 interface AppBarProps {
   title: string;
@@ -17,6 +18,7 @@ interface AppBarProps {
 
 export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBarProps) {
   const [open, setOpen] = useState(false);
+  const [ai, setAi] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
@@ -51,6 +53,13 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
               <Search className="h-5 w-5" />
             </button>
           )}
+          <button
+            onClick={() => setAi(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition hover:bg-glass-strong hover:text-foreground"
+            aria-label={tr("Búsqueda inteligente", "Smart search")}
+          >
+            <Sparkles className="h-5 w-5" />
+          </button>
           {rightSlot}
           <NotificationsBell />
           {!hideMenu && (
@@ -96,6 +105,7 @@ export function AppBar({ title, subtitle, onSearch, rightSlot, hideMenu }: AppBa
           )}
         </div>
       </div>
+      {ai && <AiSearchDialog onClose={() => setAi(false)} />}
     </header>
   );
 }
