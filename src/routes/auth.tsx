@@ -9,6 +9,7 @@ import { EurekupLogo } from "@/components/eurekup-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useT } from "@/lib/i18n";
 import { passwordRules } from "@/lib/password";
+import { uploadAvatar } from "@/lib/avatar-upload";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -31,13 +32,16 @@ const baseSchema = z.object({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { t } = useT();
+  const { t, tr } = useT();
   const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [nick, setNick] = useState("");
+  const [nickState, setNickState] = useState<"idle" | "checking" | "ok" | "taken" | "invalid">("idle");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
 
@@ -52,6 +56,17 @@ function AuthPage() {
   useEffect(() => {
     if (!authLoading && user) navigate({ to: "/app/chats" });
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (mode !== "signup" || !nick) return setNickState("idle");
+    if (!/^[a-z0-9_]{3,24}$/.test(nick)) return setNickState("invalid");
+    setNickState("checking");
+    const h = window.setTimeout(async () => {
+      const { data } = await supabase.rpc("username_available", { _u: nick });
+      setNickState(data ? "ok" : "taken");
+    }, 400);
+    return () => window.clearTimeout(h);
+  }, [nick, mode]);
 
   const checks = useMemo(
     () => ({
@@ -71,6 +86,10 @@ function AuthPage() {
       toast.error(parsed.error.errors[0].message);
       return;
     }
+    if (mode === "signup" && nickState !== "ok") {
+      toast.error(tr("Elige un nick disponible.", "Choose an available nick."));
+      return;
+    }
     if (mode === "signup" && !allPass) {
       toast.error(t("auth.mustContain"));
       return;
@@ -85,18 +104,22 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data: su, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
             data: {
               display_name: name,
+              username: nick,
               ...(referralCode.trim() ? { referral_code: referralCode.trim().toUpperCase() } : {}),
             },
           },
         });
         if (error) throw error;
+        if (avatarFile && su.session && su.user) {
+          await uploadAvatar(su.user.id, avatarFile).catch(() => undefined);
+        }
       }
       navigate({ to: "/app/chats" });
     } catch (err: unknown) {
@@ -131,6 +154,44 @@ function AuthPage() {
         <form onSubmit={onSubmit} className="space-y-3">
           {mode === "signup" && (
             <Field label={t("auth.name")} value={name} onChange={setName} placeholder={t("auth.namePh")} />
+          )}
+          {mode === "signup" && (
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Nick</span>
+              <div className="flex items-center rounded-2xl glass-subtle px-4 focus-within:ring-2 focus-within:ring-ring">
+                <span className="text-sm text-muted-foreground">@</span>
+                <input
+                  value={nick}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  onChange={(e) => setNick(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24))}
+                  placeholder="tu_nick"
+                  className="w-full bg-transparent py-3 pl-1 text-sm placeholder:text-muted-foreground/60 focus:outline-none"
+                />
+              </div>
+              <span className={`mt-1 block text-[11px] ${nickState === "ok" ? "text-success" : nickState === "taken" || nickState === "invalid" ? "text-destructive" : "text-muted-foreground"}`}>
+                {nickState === "ok" ? tr("Disponible", "Available")
+                  : nickState === "taken" ? tr("Ya está en uso", "Already taken")
+                  : nickState === "checking" ? tr("Comprobando…", "Checking…")
+                  : tr("3–24 caracteres: minúsculas, números y _ (sin espacios).", "3–24 characters: lowercase, numbers and _ (no spaces).")}
+              </span>
+            </label>
+          )}
+          {mode === "signup" && (
+            <label className="flex cursor-pointer items-center gap-3 rounded-2xl glass-subtle px-4 py-3 text-sm">
+              <span className="text-muted-foreground">{tr("Foto de perfil (opcional)", "Profile photo (optional)")}</span>
+              <span className="ml-auto truncate text-xs">{avatarFile?.name ?? tr("Elegir…", "Choose…")}</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f && f.type.startsWith("image/") && f.size <= 5 * 1024 * 1024) setAvatarFile(f);
+                  else if (f) toast.error(tr("Imagen de máx. 5 MB.", "Image up to 5 MB."));
+                }}
+              />
+            </label>
           )}
           <Field label={t("auth.email")} type="email" value={email} onChange={setEmail} placeholder="tu@email.com" autoComplete="email" />
           <PasswordField
@@ -180,7 +241,7 @@ function AuthPage() {
 
           <button
             type="submit"
-            disabled={loading || (mode === "signup" && !allPass)}
+            disabled={loading || (mode === "signup" && (!allPass || nickState !== "ok"))}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-sm font-semibold text-primary-foreground shadow-soft transition hover:opacity-95 disabled:opacity-50"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
