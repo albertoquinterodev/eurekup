@@ -93,11 +93,7 @@ function Contacts() {
     setAdding(true);
     try {
       const target = parsed.data;
-      const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, avatar_url:visible_avatar" as "id, display_name, username, avatar_url")
-        .eq("username", target)
-        .limit(1);
+      const { data: profiles, error: pErr } = await supabase.rpc("find_profile_by_username", { _u: target });
       if (pErr) throw pErr;
       const profile = profiles?.[0];
       if (!profile) {
