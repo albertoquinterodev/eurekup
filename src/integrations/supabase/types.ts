@@ -476,6 +476,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_see_profile: {
+        Args: { _profile: string; _viewer: string }
+        Returns: boolean
+      }
+      find_profile_by_username: {
+        Args: { _u: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          username: string
+        }[]
+      }
       get_or_create_direct_conversation: {
         Args: { _peer: string }
         Returns: string
